@@ -1,0 +1,40 @@
+# Environment-specific compose overrides — copy this file to
+# `docker-compose.override.yml` in the same directory and customize for your
+# environment (Mac local dev, VPS, staging, etc.).
+#
+# `docker-compose.override.yml` is git-ignored so each environment carries its
+# own version. Docker Compose auto-loads it alongside docker-compose.yml when
+# using the default `docker compose up` flow, but our deploy uses explicit
+# `-f docker-compose.yml -f docker-compose.override.yml` for clarity.
+#
+# --- Two common shapes below (delete the one you don't need) ---
+
+services:
+  router:
+    # LOCAL DEV (Mac) — bind-mount your working tree so edits to
+    # identities/*.yml, agents/*, and scheduler/schedules.yml take effect on
+    # router restart without a git push. Uses env-based secrets (no Infisical).
+    environment:
+      SECRETS_PROVIDER: env
+    volumes:
+      - agents-data:/var/lib/agents
+      - agents-logs:/var/log/agents
+      - /Users/YOU/path/to/dev-team:/var/lib/agents/dev-team:ro
+      - /Users/YOU/path/to/dev-team-state:/var/lib/agents/dev-team-state:ro
+
+    # VPS (production) — bind-mount the cloned repos from /opt/. Delete the
+    # local-dev `environment` + `volumes` blocks above and use these instead.
+    # Production uses Infisical (from base compose default); no env override
+    # needed here.
+    #
+    # volumes:
+    #   - agents-data:/var/lib/agents
+    #   - agents-logs:/var/log/agents
+    #   - /opt/dev-team:/var/lib/agents/dev-team:ro
+    #   - /opt/dev-team-state:/var/lib/agents/dev-team-state:ro
+
+  # Both environments skip the git-pull sidecar — the bind mount above IS the
+  # sync (either your working tree in local dev, or `git pull` on the VPS).
+  git-pull:
+    profiles:
+      - never

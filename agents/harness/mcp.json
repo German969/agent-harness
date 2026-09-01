@@ -1,0 +1,55 @@
+{
+  "_comment": "Harness MCP set — Linear + GitHub + Slack baseline. Plus session-log read access for the misbehavior-debugger skill (currently a filesystem MCP placeholder; TBD during router implementation — could be a router-internal endpoint instead). No CMS / email / social / Claude Preview — Harness doesn't need any of those. Verify package names before Phase 1 deploy.",
+
+  "mcpServers": {
+    "_linear": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-linear"],
+      "env": {
+        "LINEAR_API_KEY": "${LINEAR_TOKEN}"
+      },
+      "_comment": "Linear MCP — Harness files harness-improvement / agent-misbehavior tickets; comments on tickets that triggered a Harness session; routes follow-ups."
+    },
+
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_APP_INSTALLATION_TOKEN}"
+      },
+      "_comment": "GitHub's official remote MCP server (https://api.githubcopilot.com/mcp/). The deprecated npx @modelcontextprotocol/server-github package is broken (SyntaxError on import). This remote endpoint is maintained by GitHub and stays current. Bearer token here is the GitHub App installation token minted per session by router/src/auth/github-app.ts."
+    },
+
+    "github_gitdata": {
+      "type": "sdk",
+      "_comment": "In-process Git Data tools (mcp__github_gitdata__move_file / delete_file / apply_file_ops) — content-free rename/delete via blob SHA, for files past the ~40KB Contents-API wall. Lets Harness move/remove files during dev-team refactors (its :ro mount means it commits via GitHub, not local git). Instantiated by the router adapter with the session's GitHub App installation token; refuses protected branches (main/staging/…). See router/src/github/gitDataMcp.ts."
+    },
+
+    "slack": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-slack",
+      "args": [],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
+      },
+      "_comment": "Slack MCP — Harness posts in #harness-engineering (primary), #agents-alerts (escalation), and agent-specific channels when material changes affect those agents."
+    },
+
+    "session-logs": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-filesystem",
+      "args": ["/var/log/agents/sessions"],
+      "env": {},
+      "_TBD_during_router_impl": true,
+      "_comment": "Read-only filesystem access to /var/log/agents/sessions/*.jsonl for the misbehavior-debugger skill. Implementation choice TBD during router build: this filesystem MCP is one option (simple, well-understood) — the alternative is a router-internal endpoint Harness queries directly. Pick the simpler approach when wiring this; update this entry accordingly."
+    }
+  },
+
+  "_future_mcp_candidates": {
+    "_comment": "Possible additions later. NOT enabled at v1.",
+    "sqlite-readonly": "Read-only SQLite MCP for /var/lib/agents/state.sqlite — would give Harness richer query access to sessions, cost_ledger, schedule_runs without going through the dev-team-logs CLI. Useful for gap-analyzer + misbehavior-debugger. Add when the router exposes the DB safely.",
+    "claude-meta-judge": "If we add an 'LLM-as-judge for harness changes' pattern (e.g. before opening a PR, a separate Claude session reviews Harness's proposed change for cross-impact misses), it would be a custom MCP. Speculative."
+  }
+}

@@ -1,0 +1,86 @@
+# identities/strategist.yml
+#
+# Strategist's bot identity + routing rules. See identities/README.md for the contract.
+# Placeholder values are `~`; real values fill in during Phase 2 (Strategist deploy wave).
+
+agent: strategist
+
+# ============================================================================
+# GitHub App identity
+# ============================================================================
+github:
+  app_slug: dev-team-strategist                   # https://github.com/apps/dev-team-strategist
+  app_id: 123456                                 # numeric App ID
+  bot_username: strategist-agent                  # display name in reply footers
+  installation_url: https://github.com/apps/dev-team-strategist/installations/7654321
+  installations:
+    target_project: 7654321                     # installation_id on German969/chatbots (the target project)
+  # Target repo — Strategist's founding/PRD/research outputs land here.
+  target_repo:
+    owner: German969
+    name: chatbots
+    default_branch: main
+
+# ============================================================================
+# Linear agent identity
+# ============================================================================
+linear:
+  agent_handle: strategist-bot                    # for @-mention matching in Linear comments
+  agent_id: ~                                     # 'agent_*' UUID from Linear after registration
+  user_id: ~                                      # 'usr_*' UUID — used for assignment-detection
+  # The fleet shares ONE Linear webhook ("Dev Team Router" → /webhooks/linear), so this
+  # is declared on exactly one identity. It tells ingress WHICH SECRET verifies the
+  # signature (LINEAR_WEBHOOK_SECRET_strategist below) — it does NOT make Strategist the
+  # agent that handles Linear events. The classifier routes those by mention
+  # (linear.agent_handle) → assignee → label (routing.linear_labels). Leave `~` on every
+  # other agent; two identities claiming it would make secret lookup order-dependent.
+  webhook_id: 00000000-0000-0000-0000-000000000000
+
+# ============================================================================
+# Slack app identity
+# ============================================================================
+slack:
+  app_id: A0123ABCDEF                                       # 'A0...' — fill in at Phase 7
+  bot_user_id: U0123ABCDEF                                  # 'U0...' — for @-mention matching
+  team_id: T0123ABCDEF                                      # workspace id — consumed by the slack MCP as ${SLACK_TEAM_ID}
+  channels:
+    primary:                                      # Strategist's natural Slack territory
+      - "#engineering"
+      - "#planning"
+    alerts: "#agents-alerts"
+
+# ============================================================================
+# Routing rules — beyond explicit mentions
+# ============================================================================
+routing:
+  # Linear tickets with these labels route to Strategist when no explicit mention
+  linear_labels:
+    - prd                                         # Product Manager skill
+    - scope-question                              # Business Analyst skill
+    - support-feedback                            # Support/Triage skill
+    - research                                    # Researcher skill
+    - status-question                             # Project Manager skill
+    - curate                                      # Knowledge Curator skill
+    - design-prefill                              # Claude Design pre-fill skill
+    - founding                                    # Founding skill (Phase 0 / re-founding)
+  # Slack channel-default routing (messages without explicit mention)
+  slack_default_channels: []                      # Strategist doesn't claim a channel by default
+  # GitHub event types that auto-fire Strategist (Strategist mostly does NOT auto-fire)
+  github_auto_triggers: []
+
+# ============================================================================
+# Conversation continuity
+# ============================================================================
+continuation_timeout_days: 30                     # 30d default; same thread reuses session within window
+
+# ============================================================================
+# Secret references (NAMES only — values in Infisical)
+# ============================================================================
+secrets:
+  github_app_private_key: GITHUB_APP_PRIVATE_KEY_strategist
+  github_webhook_secret: GITHUB_APP_WEBHOOK_SECRET_strategist
+  linear_token: LINEAR_TOKEN_strategist
+  linear_webhook_secret: LINEAR_WEBHOOK_SECRET_strategist
+  slack_bot_token: SLACK_BOT_TOKEN_strategist
+  slack_signing_secret: SLACK_SIGNING_SECRET_strategist
+  anthropic_api_key: ANTHROPIC_API_KEY

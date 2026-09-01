@@ -1,0 +1,88 @@
+# identities/marketer.yml
+#
+# Marketer's bot identity + routing rules. See identities/README.md.
+# Placeholder values are `~`; real values fill in during Phase 6.
+#
+# IMPORTANT: Marketer's GitHub App is installed on the <target-project>-marketing
+# repo (content drafts + campaign retrospectives) — NOT the main target project
+# (Marketer never touches app code). Also: continuation timeout extended to 60d
+# because multi-week campaign threads are common.
+
+agent: marketer
+
+# ============================================================================
+# GitHub App identity
+# ============================================================================
+github:
+  app_slug: marketer-bot
+  app_id: ~
+  bot_username: marketer-bot[bot]
+  installation_url: ~
+  # Marketer only installs on the marketing-content repo
+  installations:
+    marketing_repo: ~                             # installation_id for <target-project>-marketing
+
+# ============================================================================
+# Linear agent identity
+# ============================================================================
+linear:
+  agent_handle: marketer-bot
+  agent_id: ~
+  user_id: ~
+
+# ============================================================================
+# Slack app identity
+# ============================================================================
+slack:
+  app_id: ~
+  bot_user_id: ~
+  team_id: ~                                                # 'T...' workspace id - required by the slack MCP (${SLACK_TEAM_ID}); fill at deploy
+  channels:
+    primary:
+      - "#marketing"                              # content drafts + creative briefs
+      - "#growth"                                 # benchmarking + growth-analyst posts
+      - "#leadership"                             # high-stakes PR + monthly cross-campaign summary
+    alerts: "#agents-alerts"
+
+# ============================================================================
+# Routing rules
+# ============================================================================
+routing:
+  linear_labels:
+    - campaign                                    # campaign-lead skill
+    - content                                     # content-writer skill
+    - social                                      # social-community skill
+    - email                                       # email-lifecycle skill
+    - pr                                          # pr-brand-steward skill
+    - brand                                       # pr-brand-steward (voice review)
+    - growth                                      # growth-analyst skill
+    - competitive-intel                           # benchmarking skill
+    - design                                      # creative-brief skill (when paired with content)
+    - marketing-asset                             # creative-brief skill
+    - marketer-bot                                # explicit routing-by-label
+  slack_default_channels:
+    - "#marketing"
+    - "#growth"
+  github_auto_triggers: []                        # Marketer doesn't auto-fire
+
+# ============================================================================
+# Conversation continuity
+# ============================================================================
+continuation_timeout_days: 60                     # extended — campaigns span multi-week threads
+
+# ============================================================================
+# Secret references
+# ============================================================================
+secrets:
+  github_app_private_key: GITHUB_APP_PRIVATE_KEY_marketer
+  github_webhook_secret: GITHUB_APP_WEBHOOK_SECRET_marketer
+  linear_token: LINEAR_TOKEN_marketer
+  linear_webhook_secret: LINEAR_WEBHOOK_SECRET_marketer
+  slack_bot_token: SLACK_BOT_TOKEN_marketer
+  slack_signing_secret: SLACK_SIGNING_SECRET_marketer
+  anthropic_api_key: ANTHROPIC_API_KEY
+  # Platform-specific secrets (filled in once toolbelt is decided in Phase 6)
+  cms_api_key: CMS_API_KEY_marketer
+  email_platform_api_key: EMAIL_PLATFORM_API_KEY_marketer
+  social_scheduler_api_key: SOCIAL_SCHEDULER_API_KEY_marketer
+  analytics_api_key: ANALYTICS_API_KEY_marketer

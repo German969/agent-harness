@@ -1,0 +1,191 @@
+# Production docker-compose for the dev-team router.
+#
+# Services:
+#   router      — the fastify HTTP + webhook consumer + scheduler
+#   cloudflared — Cloudflare Tunnel; publishes the router as https://... without opening ports
+#
+# Secrets are fetched at session time from Infisical Cloud
+# (https://app.infisical.com). See README.md for the machine-identity setup.
+#
+# Volumes:
+#   agents-data   — SQLite state (/var/lib/agents)
+#   agents-logs   — per-session jsonl (/var/log/agents/sessions)
+#   dev-team-repo — the checked-out dev-team repo (kept in sync by git-pull-loop.sh)
+#
+# See README.md for VPS provisioning + first-boot instructions.
+
+networks:
+  agents-net:
+    driver: bridge
+
+volumes:
+  agents-data:
+  agents-logs:
+  dev-team-repo:
+  # Target-project repo (read-only mirror). Agents read house-style/founding docs
+  # from here. Kept fresh by the `chatbots-git-pull` sidecar (reset --hard is safe:
+  # nothing writes to this volume locally — agents change it via PRs on GitHub).
+  chatbots-repo:
+  # dev-team-state (read-WRITE). Agents commit per-agent memory here via SessionEnd
+  # hooks. Populated ONCE by `dev-team-state-init` and then left alone — a pull/reset
+  # loop would clobber those local commits.
+  dev-team-state:
+
+services:
+  router:
+    image: dev-team-router:latest
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: dev-team-router
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      STATE_DB_PATH: /var/lib/agents/state.sqlite
+      DEV_TEAM_ROOT: /var/lib/agents/dev-team
+      # Target-project repo root — where agents read <target-project>/founding/*,
+      # docs/, etc. Must match the chatbots-repo mount path below. NOTE: the repo
+      # FOLDER is `chatbots`, but the PROJECT is `iris` (the product identity) —
+      # these are intentionally distinct; the folder name need not equal PROJECT_NAME.
+      TARGET_PROJECT_ROOT: /var/lib/agents/chatbots
+      # ${PROJECT} partition name — drives dev-team-state/projects/${PROJECT}/…, the
+      # SessionStart load hooks, the SessionEnd git_commit paths, and reply routing.
+      # Must match where agents actually write state: projects/iris/ (the product is
+      # Iris, "Chat Studio para WhatsApp"; the repo just happens to be named chatbots).
+      PROJECT_NAME: iris
+      SESSION_LOG_DIR: /var/log/agents/sessions
+      # Restrict each session's built-in tools to the agent's permissions.allow.
+      # Surfaced here so it can be flipped from the VPS .env without a code change:
+      # this is the first control that REMOVES capability from a running agent, and
+      # if an agent turns out to rely on a built-in its config never declared, the
+      # fix should be one `docker compose up -d` rather than a revert and a deploy.
+      # Set TOOL_ALLOWLIST_ENABLED=false in .env to fall back to unrestricted.
+      TOOL_ALLOWLIST_ENABLED: ${TOOL_ALLOWLIST_ENABLED:-true}
+      SECRETS_PROVIDER: infisical
+      # SessionEnd git_commit hooks with "push": true push dev-team-state to origin
+      # for off-box durability. The router runs as uid 1001 (agents), so ~/.ssh is
+      # /home/agents/.ssh — not /root/.ssh like the root sidecars. -F /dev/null skips
+      # the uid-1000 host ssh config; -i picks the state deploy key explicitly.
+      #
+      # HOST-SIDE PREREQUISITES (not automated — a re-provisioned box must redo these):
+      #   1. chown 1001:1001 /home/agents/.ssh/dev-team-state-deploy  (uid 1001 must own the key; keep 0600)
+      #   2. chmod o+x /home/agents/.ssh   (dir is 0700 owned by the login user uid 1000; uid 1001
+      #      needs traverse — NOT chown, which would break the host user's sshd login via StrictModes.
+      #      o+x is execute-only: no listing, other 0600 keys stay unreadable by 1001.)
+      #   3. The dev-team-state deploy key must have WRITE access on GitHub (add it with the box checked;
+      #      deploy-key write can't be toggled after creation — delete + re-add to change it).
+      GIT_SSH_COMMAND: "ssh -F /dev/null -i /home/agents/.ssh/dev-team-state-deploy -o IdentitiesOnly=yes -o UserKnownHostsFile=/home/agents/.ssh/known_hosts -o StrictHostKeyChecking=accept-new"
+    volumes:
+      - agents-data:/var/lib/agents
+      - agents-logs:/var/log/agents
+      - dev-team-repo:/var/lib/agents/dev-team:ro
+      # NOT :ro. `git worktree add` writes to the SOURCE repo's .git (it records
+      # the new worktree under .git/worktrees and creates the agent branch), so a
+      # read-only mount fails acquisition outright and a Builder has nowhere to
+      # write. Agents still never edit this checkout directly — they work in the
+      # per-task worktrees under /var/lib/agents/worktrees and land changes via
+      # PRs. The chatbots-git-pull sidecar's `reset --hard` stays safe: it moves
+      # only the mirror's own branch, not the agent branches or worktrees.
+      - chatbots-repo:/var/lib/agents/chatbots
+      # dev-team-state must be a SIBLING of dev-team (the router derives its path as
+      # <dev-team-root>/../dev-team-state). :rw — SessionEnd hooks commit here.
+      - dev-team-state:/var/lib/agents/dev-team-state
+      # SSH creds for pushing dev-team-state to origin (see GIT_SSH_COMMAND above).
+      # Router user is uid 1001, so mount at its home, NOT /root (uid 1001 can't
+      # traverse root's 0700 home). Read-only — the router never writes keys.
+      - /home/agents/.ssh:/home/agents/.ssh:ro
+    networks:
+      - agents-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: dev-team-cloudflared
+    restart: unless-stopped
+    # Token-based auth: --token supersedes any --config file, and pulls
+    # ingress + credentials from the Cloudflare dashboard at runtime. Set
+    # CLOUDFLARE_TUNNEL_TOKEN in deploy/.env (never commit the token literal).
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - router
+    networks:
+      - agents-net
+
+  # Optional: git-pull-loop sidecar that keeps `dev-team-repo` fresh from origin.
+  # Runs `git pull` every 60s inside the volume; the router hot-reloads config on
+  # the next session start (see ARCHITECTURE.md §2.13). identities/*.yml is the
+  # exception — the routing registry is built at boot and needs a router recreate.
+  git-pull:
+    image: alpine/git:latest
+    container_name: dev-team-git-pull
+    restart: unless-stopped
+    volumes:
+      - dev-team-repo:/repo
+      - ./scripts/git-pull-loop.sh:/git-pull-loop.sh:ro
+      # SSH keys + known_hosts for cloning over git@github.com. Read-only.
+      # alpine/git runs as root, so ~/.ssh resolves to /root/.ssh in-container.
+      - /home/agents/.ssh:/root/.ssh:ro
+    environment:
+      REPO_URL: ${DEV_TEAM_REPO_URL}
+      REPO_BRANCH: ${DEV_TEAM_REPO_BRANCH:-main}
+      # -F /dev/null: ignore ~/.ssh/config (owned by uid 1000 on the host, which
+      # ssh-as-root rejects). Pick the key explicitly instead.
+      GIT_SSH_COMMAND: "ssh -F /dev/null -i /root/.ssh/dev-team-deploy -o IdentitiesOnly=yes -o UserKnownHostsFile=/root/.ssh/known_hosts -o StrictHostKeyChecking=accept-new"
+    entrypoint: ["/bin/sh", "/git-pull-loop.sh"]
+    networks:
+      - agents-net
+
+  # Keeps the target-project mirror fresh. reset --hard is safe here — it moves only
+  # the mirror's own branch, never the agent branches or the worktrees cut from it.
+  chatbots-git-pull:
+    image: alpine/git:latest
+    container_name: dev-team-chatbots-git-pull
+    restart: unless-stopped
+    volumes:
+      - chatbots-repo:/repo
+      - ./scripts/git-pull-loop.sh:/git-pull-loop.sh:ro
+      # Per-repo deploy key (chatbots). Read-only.
+      - /home/agents/.ssh:/root/.ssh:ro
+    environment:
+      REPO_URL: ${CHATBOTS_REPO_URL}
+      REPO_BRANCH: ${CHATBOTS_REPO_BRANCH:-main}
+      # Hand the checkout to the router's uid (`agents`, 1001 — see deploy/Dockerfile).
+      # This sidecar runs as root, so without it the mirror is root-owned and the router
+      # cannot `git worktree add`: creating the agent branch needs mkdir inside
+      # .git/refs/heads. Set here and NOT on dev-team-git-pull, whose volume the router
+      # mounts :ro and must never write to.
+      REPO_OWNER: "1001:1001"
+      # Founding/docs change 1–2×/day at most; no need to poll every minute.
+      PULL_INTERVAL: "600"
+      # Force the chatbots deploy key; -F /dev/null skips the uid-1000 ssh config.
+      GIT_SSH_COMMAND: "ssh -F /dev/null -i /root/.ssh/chatbots-deploy -o IdentitiesOnly=yes -o UserKnownHostsFile=/root/.ssh/known_hosts -o StrictHostKeyChecking=accept-new"
+    entrypoint: ["/bin/sh", "/git-pull-loop.sh"]
+    networks:
+      - agents-net
+
+  # Populates dev-team-state ONCE, then idles. Never pulls/resets — the agents own
+  # this repo's contents via SessionEnd commits, and a reset would wipe them.
+  dev-team-state-init:
+    image: alpine/git:latest
+    container_name: dev-team-state-init
+    restart: unless-stopped
+    volumes:
+      - dev-team-state:/repo
+      - ./scripts/git-clone-once.sh:/git-clone-once.sh:ro
+      # Per-repo deploy key (dev-team-state). Read-only.
+      - /home/agents/.ssh:/root/.ssh:ro
+    environment:
+      REPO_URL: ${DEV_TEAM_STATE_REPO_URL}
+      REPO_BRANCH: ${DEV_TEAM_STATE_REPO_BRANCH:-main}
+      # Force the dev-team-state deploy key; -F /dev/null skips the uid-1000 ssh config.
+      GIT_SSH_COMMAND: "ssh -F /dev/null -i /root/.ssh/dev-team-state-deploy -o IdentitiesOnly=yes -o UserKnownHostsFile=/root/.ssh/known_hosts -o StrictHostKeyChecking=accept-new"
+    entrypoint: ["/bin/sh", "/git-clone-once.sh"]
+    networks:
+      - agents-net

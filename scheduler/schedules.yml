@@ -1,0 +1,535 @@
+# scheduler/schedules.yml
+#
+# All scheduled jobs across the 6-agent fleet.
+#
+# DEFAULT: every entry below is `enabled: false`. By design, schedules don't
+# fire until they're explicitly activated. See router/ARCHITECTURE.md §2.8 for
+# the hybrid mechanism: YAML default → runtime override → phase gate.
+#
+# Activate via:
+#   /agents schedule enable <id>             (Slack — default)
+#   dev-team-logs schedule enable <id>       (CLI — for scripted ops)
+#
+# Project phase gates: each entry's `requires_project_phase` blocks firing
+# until <target-project>/.dev-team.yml → project.phase reaches that level.
+# An entry that's enabled: true but phase-gated still won't fire until both
+# conditions are met.
+#
+# Cron format: standard 5-field cron (minute hour day-of-month month day-of-week).
+# Croner AND-semantics: when both day-of-month AND day-of-week are specified,
+# both must match — useful for "first Friday of the month" style expressions.
+#
+# Timezone: default America/New_York. Override per-entry if the project's
+# primary timezone differs. (Phase 0 founding work should record the project
+# timezone; this file inherits it.)
+#
+# Reply destinations: provider + channel. The channel must be one the agent's
+# settings.json allow-list permits.
+
+# ============================================================================
+# STRATEGIST
+# ============================================================================
+
+- id: strategist-pjm-daily-standup
+  cron: "0 9 * * *"
+  timezone: America/New_York
+  agent: strategist
+  skill: pjm
+  trigger:
+    kind: scheduled
+    message: |
+      Run today's standup. Summarize from Linear + GitHub:
+      - Tickets closed yesterday
+      - Tickets moving today (in-progress / in-review)
+      - Anyone blocked (tickets with `blocked` label or stale > 2 days)
+      Post a single thread to #engineering. Keep it short — three bullets max
+      per section. Link specific tickets; don't paraphrase.
+    reply_to:
+      provider: slack
+      channel: "#engineering"
+  enabled: false
+  requires_project_phase: phase-2
+
+- id: strategist-pjm-weekly-sprint-review
+  cron: "0 9 * * MON"
+  timezone: America/New_York
+  agent: strategist
+  skill: pjm
+  trigger:
+    kind: scheduled
+    message: |
+      Run the weekly sprint review. Walk through:
+      - Tickets closed last week (count + headline items)
+      - Tickets in flight (count + risk-flagged ones)
+      - New blockers since last review
+      - Risks for the next 5 days (capacity, dependencies, external)
+      Post to #engineering as a single thread with sections. Include direct
+      Linear links for each ticket called out.
+    reply_to:
+      provider: slack
+      channel: "#engineering"
+  enabled: false
+  requires_project_phase: phase-2
+
+- id: strategist-curator-weekly-drift-sweep
+  cron: "0 14 * * FRI"
+  timezone: America/New_York
+  agent: strategist
+  skill: curator
+  trigger:
+    kind: scheduled
+    message: |
+      Run the weekly drift sweep (per skill curator.md):
+      - Walk tracked docs in dev-team-state/projects/<project>/strategist/drift-watchlist.md
+      - Classify: high-confidence drift / ambiguous / stylistic stale
+      - Open docs PRs for high-confidence; Linear issues for ambiguous
+      - Sensitive-paths backstop: walk sensitive pattern families against guardian/sensitive-paths.yml
+      Also: run the Product-Marketing weekly sync pass (read what @marketer-agent
+      contributed to _shared/strategist-marketer since the last sync marker;
+      take action if needed; append sync-log.md entry).
+      Silent if no findings.
+    reply_to:
+      provider: slack
+      channel: "#engineering"
+  enabled: false
+  requires_project_phase: phase-2
+  # Notes:
+  #  - This entry runs at 14:00 ET so the curator's Friday contributions land
+  #    BEFORE Marketer's 16:00 ET campaign-lead Friday sync reads them.
+  #  - Coding-practices / design-system quarterly checks are a separate entry
+  #    (strategist-curator-quarterly-practices) — they need phase-5 to be useful.
+
+- id: strategist-curator-quarterly-practices
+  cron: "0 14 1-7 1,4,7,10 FRI"
+  timezone: America/New_York
+  agent: strategist
+  skill: curator
+  trigger:
+    kind: scheduled
+    message: |
+      Run the quarterly drift checks per curator.md §"Coding-practices drift check"
+      and §"Design-system drift check":
+      - Both Builder coding-practices docs (builder-server + builder-client)
+      - design-system.md
+      Look for: stale references, STACK.md conflicts, duplicates, ADR overlap,
+      accumulation noise (>30 entries).
+      Output: low-severity Linear tickets to @server-agent and @client-agent with
+      enumerated findings. Never auto-edit the Builders' docs — they own them.
+    reply_to:
+      provider: slack
+      channel: "#engineering"
+  enabled: false
+  requires_project_phase: phase-5
+  # First Friday of Jan/Apr/Jul/Oct (DOM 1-7 + DOW=FRI = first Friday).
+
+# ============================================================================
+# PLATFORM
+# ============================================================================
+
+- id: platform-finops-daily-quick-check
+  cron: "30 9 * * *"
+  timezone: America/New_York
+  agent: platform
+  skill: finops
+  trigger:
+    kind: scheduled
+    message: |
+      Run the daily FinOps quick check (per finops.md):
+      - Pull yesterday's per-agent spend from the router's cost_ledger
+      - Compare against trailing-7-day baseline
+      - Flag anomalies: any agent >2× its daily baseline; any session >$5;
+        any agent approaching its monthly cap (>80%)
+      - If anomalies: post to #agents-alerts with specifics
+      - If clean: silent (no daily ping spam)
+    reply_to:
+      provider: slack
+      channel: "#agents-alerts"
+  enabled: false
+  requires_project_phase: phase-3
+
+- id: platform-finops-weekly-report
+  cron: "0 10 * * MON"
+  timezone: America/New_York
+  agent: platform
+  skill: finops
+  trigger:
+    kind: scheduled
+    message: |
+      Run the weekly FinOps detailed report (per finops.md):
+      - Per-agent spend last 7 days vs. trailing baseline
+      - Top 5 most expensive sessions
+      - Cap utilization per agent (MTD vs. monthly cap, projection to month-end)
+      - Anomalies + recommended levers
+      Post to #agents-alerts. Always post (even all-clear) — discipline of weekly visibility.
+    reply_to:
+      provider: slack
+      channel: "#agents-alerts"
+  enabled: false
+  requires_project_phase: phase-3
+
+- id: platform-finops-monthly-attribution
+  cron: "0 10 1 * *"
+  timezone: America/New_York
+  agent: platform
+  skill: finops
+  trigger:
+    kind: scheduled
+    message: |
+      Run the monthly FinOps cross-feature attribution summary (per finops.md):
+      - Per-feature/per-PR cost derivation from closed-prs/ logs
+      - Per-skill cost rollup (which skills carry the load)
+      - Per-campaign cost (Marketer)
+      - Compare to projections in COST_ANALYSIS.md; flag drift
+      - Recommend cap adjustments (up or down) based on actuals
+      Post to #leadership and #agents-alerts.
+    reply_to:
+      provider: slack
+      channel: "#leadership"
+  enabled: false
+  requires_project_phase: phase-3
+
+- id: platform-release-manager-weekly
+  cron: "0 9 * * THU"
+  timezone: America/New_York
+  agent: platform
+  skill: release-manager
+  trigger:
+    kind: scheduled
+    message: |
+      Cut this week's release (per release-manager.md):
+      - Walk merged PRs since the last release
+      - Group by type (feature / fix / chore); classify version bump
+        (major/minor/patch) using semver discipline
+      - Generate changelog
+      - Create GitHub release draft (NOT publish — humans verify)
+      - Prepare deploy plan (NOT execute — production-safety rule)
+      - Post a release-ready notice to #engineering with the draft link
+      If gates aren't met (CI not green, open P0/P1 incidents, missing
+      Guardian sign-off) → DON'T draft a release; post the blocker instead.
+    reply_to:
+      provider: slack
+      channel: "#engineering"
+  enabled: false
+  requires_project_phase: phase-4
+  # Notes:
+  #  - phase-4 because we need code shipping (Builders online) for releases
+  #    to make sense. Often projects also want their first manual release before
+  #    enabling the weekly cron — use /agents schedule enable when ready.
+
+# ============================================================================
+# GUARDIAN
+# ============================================================================
+
+- id: guardian-llm-security-weekly-eval
+  cron: "0 9 * * MON"
+  timezone: America/New_York
+  agent: guardian
+  skill: llm-security
+  trigger:
+    kind: scheduled
+    message: |
+      Run the weekly adversarial-eval suite against production AI features
+      (per llm-security.md):
+      - Execute tests/llm-security/ across all attack families
+      - Compare pass rate to the baseline at
+        dev-team-state/projects/<project>/guardian/llm-security/baseline.md
+      - If pass-rate dropped without a prompt change → likely model-vendor shift;
+        file P0 + page @server-agent (ai-specialist)
+      - Add any new attack patterns the research community has surfaced this week
+      - Post a weekly summary to #security (always post, even all-clear)
+    reply_to:
+      provider: slack
+      channel: "#security"
+  enabled: false
+  requires_project_phase: phase-5
+  # Notes:
+  #  - If the target project has NO AI features yet, leave this entry disabled.
+  #    The eval suite costs $20-40/mo of token spend with nothing to actually
+  #    scan. Enable only after the first AI feature ships.
+
+- id: guardian-dependency-audit-weekly
+  cron: "0 10 * * WED"
+  timezone: America/New_York
+  agent: guardian
+  skill: security
+  trigger:
+    kind: scheduled
+    message: |
+      Run the weekly dependency CVE sweep (per security.md):
+      - Audit all dependencies in package.json/Cargo.toml/pyproject.toml/etc.
+        for newly-disclosed CVEs (osv-scanner / npm audit / pnpm audit)
+      - For each finding: severity, affected version range, available fix
+      - Open dep-bump PRs for low-risk mechanical fixes
+      - File Linear tickets for substantive findings, routed to the relevant Builder
+      - Post a summary to #security if any findings (silent if clean)
+    reply_to:
+      provider: slack
+      channel: "#security"
+  enabled: false
+  requires_project_phase: phase-5
+
+- id: guardian-compliance-monthly-audit
+  cron: "0 11 1 * *"
+  timezone: America/New_York
+  agent: guardian
+  skill: compliance
+  trigger:
+    kind: scheduled
+    message: |
+      Run the monthly compliance audit (per compliance.md):
+      - Walk regulated paths per dev-team-state/projects/<project>/guardian/compliance-scope.yml
+      - Compare against the baseline at compliance-baseline.md
+      - Flag drift: missing audit calls, new PII-touching code without policy doc,
+        sub-processor additions not in the documented list
+      - Output: audit report in <target-project>/docs/compliance/audit-trail/<date>.md
+      - For substantive findings: Linear tickets to relevant Builders with `legal-review` label
+      Post a summary to #security + #compliance.
+    reply_to:
+      provider: slack
+      channel: "#compliance"
+  enabled: false
+  requires_project_phase: phase-5
+  # Notes:
+  #  - Refuse to activate if <target-project>/founding/COMPLIANCE.md and
+  #    compliance-scope.yml are both missing. The skill is shadow-boxing without
+  #    scope definition.
+
+- id: guardian-performance-monthly-baseline-review
+  cron: "0 10 5 * *"
+  timezone: America/New_York
+  agent: guardian
+  skill: performance
+  trigger:
+    kind: scheduled
+    message: |
+      Run the monthly performance baseline review (per performance.md):
+      - Compare current benchmark numbers to the baseline at
+        dev-team-state/projects/<project>/guardian/perf/baseline.md
+      - Flag regressions > 10% on any tracked endpoint/page
+      - Flag improvements > 20% (worth investigating + baselining)
+      - Update the baseline if benchmarks have shifted intentionally
+      - File Linear tickets for substantive regressions, routed to relevant Builders
+      Post a summary to #engineering.
+    reply_to:
+      provider: slack
+      channel: "#engineering"
+  enabled: false
+  requires_project_phase: phase-5
+
+- id: guardian-design-system-weekly-drift
+  cron: "0 14 * * WED"
+  timezone: America/New_York
+  agent: guardian
+  skill: design-system
+  trigger:
+    kind: scheduled
+    message: |
+      Run the weekly cross-PR design-system drift scan (per design-system.md):
+      - Scan PRs merged in the last 7 days for token-discipline violations
+        (hardcoded hex, raw px values, inline styles, UI-kit shadowing)
+      - Aggregate findings; identify pattern-level issues (3+ PRs introducing
+        the same anti-pattern)
+      - Output: drift report in <target-project>/docs/design-system/drift/<date>.md
+        IF findings exceed a small threshold (don't generate noise reports)
+      - For pattern-level concerns: Linear tickets to @client-agent
+    reply_to:
+      provider: slack
+      channel: "#engineering"
+  enabled: false
+  requires_project_phase: phase-5
+
+# ============================================================================
+# MARKETER
+# ============================================================================
+
+- id: marketer-campaign-lead-friday-pm-sync
+  cron: "0 16 * * FRI"
+  timezone: America/New_York
+  agent: marketer
+  skill: campaign-lead
+  trigger:
+    kind: scheduled
+    message: |
+      Run the weekly Friday Product-Marketing sync (per Product-Marketing Sync Protocol):
+      - Read _shared/strategist-marketer/sync-log.md for the last sync marker
+      - Read what @strategist-agent contributed since: customer signals, roadmap
+        updates, positioning insights, narrative grounding
+      - Update own state if relevant (editorial calendar, campaign-readiness planning,
+        pattern library)
+      - Append a brief entry to sync-log.md summarizing what was processed + decisions
+      Silent in Slack if no meaningful new content; post if something material surfaced.
+    reply_to:
+      provider: slack
+      channel: "#growth"
+  enabled: false
+  requires_project_phase: phase-6
+  # Notes:
+  #  - Runs at 16:00 ET, AFTER Strategist's curator sweep at 14:00 ET — gives
+  #    the Curator's Friday contributions time to land before Marketer reads them.
+
+- id: marketer-benchmarking-weekly-quick-scan
+  cron: "0 10 * * TUE"
+  timezone: America/New_York
+  agent: marketer
+  skill: benchmarking
+  trigger:
+    kind: scheduled
+    message: |
+      Run the weekly competitor quick-scan (per benchmarking.md):
+      - For each tracked competitor in benchmarking/competitors.yml: fetch
+        marketing page, pricing page, latest blog/changelog entry
+      - Diff against the last scan; note meaningful changes (new feature page,
+        pricing change, repositioning, acquisition)
+      - Update competitors.yml with source URL + observed date
+      - Post a short summary to #growth IF anything material changed
+      - Silent if quiet week
+    reply_to:
+      provider: slack
+      channel: "#growth"
+  enabled: false
+  requires_project_phase: phase-6
+
+- id: marketer-benchmarking-monthly-deep-refresh
+  cron: "0 10 1-7 * MON"
+  timezone: America/New_York
+  agent: marketer
+  skill: benchmarking
+  trigger:
+    kind: scheduled
+    message: |
+      Run the monthly competitive-intel deep refresh (per benchmarking.md):
+      - Full re-comparison across all competitors on all dimensions
+      - Refresh feature-matrix.md, pricing-comparison.md, positioning-map.md
+      - Identify market shifts: who's gaining momentum, who's stagnating,
+        what direction is the market moving
+      - Post a longer monthly competitive-intel report to #growth
+      Always post — monthly visibility into the competitive landscape is part of the value.
+    reply_to:
+      provider: slack
+      channel: "#growth"
+  enabled: false
+  requires_project_phase: phase-6
+  # First Monday of each month (DOM 1-7 + DOW=MON = first Monday).
+
+- id: marketer-growth-analyst-weekly-performance
+  cron: "0 9 * * FRI"
+  timezone: America/New_York
+  agent: marketer
+  skill: growth-analyst
+  trigger:
+    kind: scheduled
+    message: |
+      Run the weekly campaign-performance dashboard update (per growth-analyst.md):
+      - Pull last-7-day metrics across active campaigns: traffic, CTR,
+        conversion, qualified signups, lifecycle email opens/clicks
+      - Compare to per-campaign baselines + targets
+      - Flag anomalies (campaigns under-performing >50% of target;
+        channels suddenly outperforming or underperforming)
+      - Update baselines.md with any sustained shifts
+      Post to #growth. Always post.
+    reply_to:
+      provider: slack
+      channel: "#growth"
+  enabled: false
+  requires_project_phase: phase-6
+
+- id: marketer-growth-analyst-monthly-cross-campaign
+  cron: "0 14 1 * *"
+  timezone: America/New_York
+  agent: marketer
+  skill: growth-analyst
+  trigger:
+    kind: scheduled
+    message: |
+      Run the monthly cross-campaign summary (per growth-analyst.md):
+      - Aggregate results from all campaigns that completed in the previous month
+      - Per-channel attribution rollup; which channels carried the month
+      - Identify patterns: what types of content/topic/timing drove the best
+        results; what to repeat; what to drop
+      - Update campaign-patterns.md in dev-team-state with codified lessons
+      Post to #growth + #leadership.
+    reply_to:
+      provider: slack
+      channel: "#leadership"
+  enabled: false
+  requires_project_phase: phase-6
+
+# Marketer's social-community cadence is project-configured — typical default
+# is 2x weekly LinkedIn, 3x weekly X. Authoring these requires knowing the
+# project's channels and editorial calendar. Uncomment + adjust once that's
+# decided in Phase 6.
+#
+# - id: marketer-social-community-linkedin-tue
+#   cron: "0 10 * * TUE"
+#   timezone: America/New_York
+#   agent: marketer
+#   skill: social-community
+#   trigger:
+#     kind: scheduled
+#     message: |
+#       Run the LinkedIn Tuesday cadence (per social-community.md):
+#       - Check editorial calendar for the slotted topic
+#       - If empty, pick from the queue (feature talk / customer story /
+#         industry commentary / community amplification)
+#       - Draft per LinkedIn norms (~150 words, hook + body + CTA)
+#       - Invoke creative-brief if a visual benefits the post
+#       - Save to Buffer (or whichever scheduler) in unscheduled draft state
+#       - Slack notification to #marketing for human approval + posting
+#     reply_to:
+#       provider: slack
+#       channel: "#marketing"
+#   enabled: false
+#   requires_project_phase: phase-6
+#
+# - id: marketer-social-community-linkedin-thu
+#   cron: "0 10 * * THU"
+#   # ... same shape as above ...
+#
+# - id: marketer-social-community-x-mon
+#   cron: "0 11 * * MON"
+#   # ... etc.
+
+# ============================================================================
+# HARNESS (meta-agent)
+# ============================================================================
+
+- id: harness-gap-analyzer-monthly
+  cron: "0 14 1 * *"
+  timezone: America/New_York
+  agent: harness
+  skill: gap-analyzer
+  trigger:
+    kind: scheduled
+    message: |
+      Run the monthly gap-analyzer survey (per gap-analyzer.md):
+      - Read every agent's CLAUDE.md, settings.json, skills/, mcp.json (auto-loaded)
+      - Look for patterns repeated across agents that could be promoted
+      - Look for SPEC sections referenced but not yet implemented
+      - Look for new behaviors humans have requested in #harness-engineering this month
+      - Cross-reference against the misbehavior log
+      - Score findings (Low/Medium/High); cap at 20 candidate findings
+      Output: a digest posted to #harness-engineering. NO auto-PRs from this skill —
+      humans triage the digest and pick which items to ask Harness to implement.
+      Append the survey to dev-team-state/global/harness/gap-survey-history.md.
+    reply_to:
+      provider: slack
+      channel: "#harness-engineering"
+  enabled: false
+  requires_project_phase: phase-2
+  # Notes:
+  #  - Enable once Harness is online + at least 1 other agent exists to analyze.
+  #  - Digest-only by design: surfacing gaps, not auto-implementing them. Humans pick what to act on.
+
+# ============================================================================
+# BUILDER-SERVER + BUILDER-CLIENT
+# ============================================================================
+#
+# Both Builder agents are reactive-only — they don't have scheduled jobs in
+# their SPECs. Their work is triggered by:
+#   - Linear ticket assignment (new feature work)
+#   - PR review comments (pr-feedback skill)
+#   - PR push to their branches (Builder picks back up)
+#   - API contract bounce-backs from each other
+#
+# If a future skill (e.g. nightly dependency-update sweep, weekly tech-debt
+# review) adds a cron pattern, add the entry here.

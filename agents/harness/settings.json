@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Harness agent — the meta-agent. Maintains the dev-team repo itself: authors new agents, modifies existing ones, writes new skills, debugs misbehaviors, evolves the router. Defining constraint: PR-only — never pushes to main. See agents/harness/CLAUDE.md for the persona + AGENTS.md → The Top 6 + Harness for fleet context. No SPEC.md (Harness is the 4th agent without one — Strategist, Platform, Builders don't have SPECs either; Guardian + Marketer do).",
+
+  "model": "claude-sonnet-5",
+  "modelOverrides": {
+    "_comment": "Per-skill model routing. `conversational` is the lightweight default (fleet/router/skill/protocol Q&A + lookups + routing) — it produces no config changes and doesn't preload every agent config + router architecture + protocols + plans, so it runs on Haiku at ~1/3 the token rates; a bare question stays cheap instead of loading the fleet's entire meta-context on Sonnet (Harness's always-load is the largest of any agent). Every meta-work skill (agent-architect/agent-modifier/skill-author/gap-analyzer/misbehavior-debugger/router-engineer) stays on the default Sonnet-5 — meta-design reasoning + multi-file coherence need the depth.",
+    "conversational": "claude-haiku-4-5-20251001"
+  },
+  "thinking": {
+    "type": "enabled",
+    "budget_tokens": 6000
+  },
+  "max_turns": 50,
+
+  "costCap": {
+    "_comment": "Harness is heavier than Guardian (multi-file PRs + cross-impact analysis) but lighter than Marketer (no campaign orchestration). Counts as infrastructure spend, not per-feature spend. See COST_ANALYSIS.md.",
+    "perJobCostUsd": 8.00,
+    "perJobTokens": 800000,
+    "monthlyCostUsd": 100.00,
+    "monthlyTokensApprox": 8000000,
+    "warnAtPercent": 80,
+    "alertChannel": "#agents-alerts",
+    "onCapReached": "refuse_session",
+    "offHoursThrottling": null
+  },
+
+  "permissions": {
+    "_permissions_note": "Read-only tools stay in `allow` for perf (canUseTool would fire per call, adding latency for no safety benefit). MUTATING tools (Write, Edit, PR creation, comment posting) are intentionally OMITTED from `allow` so they fall through to the SDK's canUseTool callback, which routes to our adapter's onToolCall → PreToolUse hooks. Without this, PreToolUse gates (block-push-to-main, writeScope enforcement) never fire because bare `allow` entries auto-approve before the callback runs. See the SDK's CLAUDE_SDK_CAN_USE_TOOL_SHADOWED warning.",
+    "allow": [
+      "_note: allow is not a restriction today. The SDK treats allowedTools as auto-allowed without prompting and says to use the tools option to restrict, which the router does not set yet. So this list documents what the agent actually uses, and it becomes the real boundary the moment tools is wired from it. Write/Edit/TodoWrite are declared here because they were relied on but undeclared, or parked in ask, a tier nothing reads.",
+      "Write",
+      "Edit",
+      "TodoWrite",
+      "WebSearch",
+      "WebFetch",
+      "Read",
+      "Grep",
+      "Glob",
+
+      "mcp__github__get_*",
+      "mcp__github__list_*",
+      "mcp__github__search_*",
+
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git status)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push origin HEAD:agent/*)",
+
+      "Bash(node:*)",
+      "Bash(npx:*)",
+      "Bash(pnpm:*)",
+      "Bash(npm:*)",
+      "Bash(yarn:*)",
+      "Bash(tsc --noEmit:*)",
+      "Bash(eslint:*)",
+      "Bash(prettier:*)",
+      "Bash(markdownlint:*)",
+
+      "Bash(jq:*)",
+      "Bash(yq:*)",
+
+      "Bash(sqlite3 /var/lib/agents/state.sqlite *)"
+    ],
+    "ask": [
+      "mcp__linear__update_issue_status",
+      "mcp__linear__assign_issue",
+      "mcp__linear__close_issue"
+    ],
+    "deny": [
+      "Bash(git push:*main*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push --no-verify:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(git commit --amend:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git rebase -i:*)",
+      "Bash(git checkout main:*)",
+      "Bash(git checkout staging:*)",
+      "Bash(rm -rf:*)",
+
+      "Bash(docker:*)",
+      "Bash(kubectl:*)",
+      "Bash(terraform:*)",
+      "Bash(pulumi:*)",
+      "Bash(aws:*)",
+      "Bash(gcloud:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(fly deploy:*)",
+
+      "mcp__github__merge_pull_request",
+      "mcp__github__delete_*",
+      "mcp__linear__delete_*",
+      "mcp__linear__archive_*",
+      "mcp__deploy__*",
+      "mcp__secrets__*",
+      "mcp__infisical__*"
+    ],
+    "defaultMode": "default"
+  },
+
+  "writeScope": {
+    "_comment": "Harness's writeScope is the inverse of every other agent. Every other agent has dev-team/ DENIED; Harness has it ALLOWED. Target project repos and other agents' state remain DENIED.",
+    "allowedPaths": [
+      "dev-team/**",
+      "dev-team-state/global/harness/**",
+      "dev-team-state/projects/*/harness/**"
+    ],
+    "deniedPaths": [
+      "<target-project>/**",
+      "<target-project>-marketing/**",
+      "dev-team-state/projects/*/strategist/**",
+      "dev-team-state/projects/*/platform/**",
+      "dev-team-state/projects/*/builder-server/**",
+      "dev-team-state/projects/*/builder-client/**",
+      "dev-team-state/projects/*/guardian/**",
+      "dev-team-state/projects/*/marketer/**",
+      "dev-team-state/projects/*/_shared/**"
+    ]
+  },
+
+  "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "Always load: founding docs (target-project context). Small + useful for every session incl. the lightweight conversational Q&A default.",
+        "command": "load",
+        "paths": [
+          "<target-project>/founding/PRODUCT.md",
+          "<target-project>/founding/BRAND.md",
+          "<target-project>/founding/STACK.md",
+          "<target-project>/founding/COMPLIANCE.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/founding/COMPLIANCE.md": "ignore"
+        }
+      },
+      {
+        "_comment": "Heavy meta-context — SYSTEM.md + ADR index + the COMPLETE set of agent configs (Harness needs to know every other agent) + router architecture + protocols + plans + scheduler + Harness state — loaded ONLY for the meta-work skills that use it. This is the largest always-load of any agent, so the lightweight `conversational` default (fleet/router Q&A + lookups) skips it entirely and reads the one relevant file on demand — a bare question doesn't cache-write the whole fleet's config every session. See load-hook `only_skills`.",
+        "command": "load",
+        "only_skills": ["agent-architect", "agent-modifier", "skill-author", "gap-analyzer", "misbehavior-debugger", "router-engineer"],
+        "paths": [
+          "<target-project>/docs/architecture/SYSTEM.md",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md",
+          "dev-team/agents/strategist/CLAUDE.md",
+          "dev-team/agents/strategist/settings.json",
+          "dev-team/agents/platform/CLAUDE.md",
+          "dev-team/agents/platform/settings.json",
+          "dev-team/agents/builder-server/CLAUDE.md",
+          "dev-team/agents/builder-server/settings.json",
+          "dev-team/agents/builder-client/CLAUDE.md",
+          "dev-team/agents/builder-client/settings.json",
+          "dev-team/agents/guardian/CLAUDE.md",
+          "dev-team/agents/guardian/settings.json",
+          "dev-team/agents/marketer/CLAUDE.md",
+          "dev-team/agents/marketer/settings.json",
+          "dev-team/agents/PROTOCOLS.md",
+          "dev-team/router/ARCHITECTURE.md",
+          "dev-team/PLAN.md",
+          "dev-team/AGENTS.md",
+          "dev-team/COST_ANALYSIS.md",
+          "dev-team/scheduler/schedules.yml",
+          "dev-team-state/projects/${PROJECT}/harness/active-changes.md",
+          "dev-team-state/projects/${PROJECT}/harness/misbehavior-log.md",
+          "dev-team-state/global/harness/gap-survey-history.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/docs/architecture/SYSTEM.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/harness/active-changes.md": "ignore_first_session",
+          "dev-team-state/projects/${PROJECT}/harness/misbehavior-log.md": "ignore_first_session",
+          "dev-team-state/global/harness/gap-survey-history.md": "ignore_first_session"
+        }
+      },
+      {
+        "_comment": "Conditional skill-state load. Skills that need extra context get it conditionally.",
+        "command": "conditional_load",
+        "by_skill": {
+          "agent-modifier": ["dev-team/agents/${TARGET_AGENT}/skills/**"],
+          "agent-architect": ["dev-team/agents/marketer/SPEC.md", "dev-team/agents/marketer/skills/**"],
+          "skill-author": ["dev-team/agents/${TARGET_AGENT}/skills/**"],
+          "misbehavior-debugger": ["/var/log/agents/sessions/${SESSION_ID}.jsonl"],
+          "router-engineer": ["dev-team/router/src/**"],
+          "gap-analyzer": ["dev-team/agents/*/skills/**", "dev-team/agents/*/mcp.json"]
+        }
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "★ THE GATE — block any direct push to main. PR-only is Harness's defining constraint.",
+        "tool": "Bash",
+        "patterns": [
+          "git push.*\\b(main|master|staging|production|prod)\\b",
+          "git push origin (main|master|staging)",
+          "--no-verify",
+          "--force(-with-lease)?\\s+origin/(main|staging)"
+        ],
+        "deny_always": true,
+        "message": "🛑 Harness NEVER pushes directly to main/staging. PR-only is the defining constraint. Use `git push origin HEAD:agent/harness/<task-id>` then open a PR."
+      },
+      {
+        "_comment": "Block writes outside Harness's scope — anything under target project, other agents' state, or paths NOT in dev-team/.",
+        "tool": "Write",
+        "block_if_path_matches": [
+          "<target-project>/**",
+          "<target-project>-marketing/**",
+          "dev-team-state/projects/*/strategist/**",
+          "dev-team-state/projects/*/platform/**",
+          "dev-team-state/projects/*/builder-server/**",
+          "dev-team-state/projects/*/builder-client/**",
+          "dev-team-state/projects/*/guardian/**",
+          "dev-team-state/projects/*/marketer/**",
+          "dev-team-state/projects/*/_shared/**"
+        ],
+        "message": "Harness's writeScope is dev-team/** + own harness state. Target project repos and other agents' state are off-limits."
+      },
+      {
+        "_comment": "Block PR-merge operations. Harness opens PRs; humans merge them.",
+        "tool": "mcp__github__merge_pull_request",
+        "deny_always": true,
+        "message": "Harness does NOT merge PRs. Humans review and merge."
+      },
+      {
+        "_comment": "Block Infisical and any secrets-system tool. Secret values are humans-only forever.",
+        "tool": ["mcp__infisical__*", "mcp__secrets__*"],
+        "deny_always": true,
+        "message": "Harness does NOT modify secrets. Infisical is humans-only."
+      },
+      {
+        "_comment": "Block direct VPS access via SSH or container management. Deploys go through PR-merge → CI.",
+        "tool": "Bash",
+        "patterns": [
+          "^ssh\\s+",
+          "^scp\\s+",
+          "^docker\\s+(run|exec|kill|stop|rm|build)",
+          "^kubectl\\s+"
+        ],
+        "deny_always": true,
+        "message": "🛑 Harness does NOT touch VPS infrastructure directly. Use deploy/* PRs that humans merge + CI executes."
+      }
+    ],
+    "PostToolUse": [
+      {
+        "_comment": "After Edit/Write to a TypeScript file under router/src/, format + lint the edited file. Deliberately NOT typecheck: tsc has no meaningful per-file mode and a multi-second whole-project pass after every Edit would dominate a session. CI typechecks, and the agent can run `pnpm typecheck` itself. This was `lint_and_typecheck`, a command with no handler — the hook did nothing at all.",
+        "tool": ["Edit", "Write"],
+        "if_path_matches": ["dev-team/router/src/**/*.ts"],
+        "command": "lint_and_format",
+        "fix": true
+      },
+      {
+        "_comment": "After Edit/Write to a markdown file under dev-team/, run markdownlint + prettier.",
+        "tool": ["Edit", "Write"],
+        "if_path_matches": ["dev-team/**/*.md"],
+        "command": "format_and_lint",
+        "fix": true
+      },
+      {
+        "_comment": "After Edit/Write to a JSON/YAML file under dev-team/, validate it parses + matches its schema if known.",
+        "tool": ["Edit", "Write"],
+        "if_path_matches": ["dev-team/**/*.json", "dev-team/**/*.yml", "dev-team/**/*.yaml"],
+        "command": "validate_structured_data",
+        "fix": false
+      }
+    ],
+    "SessionEnd": [
+      {
+        "_comment": "★ Commit + PR is the ONLY commit path for Harness. Forces create_pr: true; no merge.",
+        "command": "git_commit_if_changed",
+        "repo": "dev-team",
+        "paths": ["**"],
+        "message_template": "[harness] ${SKILL}: ${SUMMARY}",
+        "create_pr": true,
+        "pr_template": "harness",
+        "pr_labels": [
+          "agent:harness-bot"
+        ],
+        "auto_apply_conditional_labels": {
+          "agents/harness/**": "meta-self-modify",
+          "router/src/**": "router-change",
+          "_multiple_agents": "cross-agent",
+          "_misbehavior_debugger": "urgent"
+        }
+      },
+      {
+        "_comment": "Commit Harness's own state changes (active-changes log, misbehavior log, gap-survey history). Bot-direct commits to dev-team-state are normal (per AGENTS.md state repo discipline).",
+        "command": "git_commit",
+        "repo": "dev-team-state",
+        "paths": [
+          "shared/**",
+        "global/harness/**",
+          "projects/${PROJECT}/harness/**"
+        ],
+        "message_template": "[harness] session ${SESSION_ID} — ${SKILL} on ${PROJECT}",
+        "push": true
+      }
+    ]
+  },
+
+  "_implementationNotes": {
+    "model": "Sonnet — meta-design reasoning + multi-file coherence are the heavy lifts. Opus opt-in for new-agent authoring + foundational router changes + multi-agent cascading edits.",
+    "thinking_budget": "6000 tokens — match Marketer's budget; cross-impact reasoning + reading multiple agent configs needs depth.",
+    "max_turns": "50 — multi-file PRs require more turns than a typical agent session. Capped to prevent runaway loops but generous for complex meta-changes.",
+    "pr_only_enforcement": "Three layers: deny list (Bash patterns), PreToolUse hook (action patterns), SessionEnd hook (forces create_pr: true). Triple defense in depth — modifying any one layer requires explicit human action.",
+    "writeScope_inverse": "Every other agent's settings.json has dev-team/** in deniedPaths. Harness has it in allowedPaths. The router's startup validation MUST detect drift: only Harness should have dev-team/** in writeScope.",
+    "session_log_access": "The misbehavior-debugger skill needs to read /var/log/agents/sessions/*.jsonl. TBD during router implementation: filesystem MCP (with read-only scope on that path) OR a router-internal endpoint Harness queries. Either works; pick the simpler one.",
+    "mcp_servers_required": ["linear", "github", "slack"],
+    "future_additions": [
+      "An optional 'simulate' / dry-run mode where Harness shows what a PR WOULD contain without actually committing — useful for review before authoring",
+      "Per-PR ChangeImpact JSON file alongside the PR description, machine-readable for downstream tooling",
+      "When other agents reach Phase-2.5 maturity, add a feedback channel where agents can flag 'my prompt feels broken' to Harness via Linear ticket"
+    ]
+  }
+}

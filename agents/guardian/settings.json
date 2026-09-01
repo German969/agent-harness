@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Guardian agent — the dev team's safety net. Auto-fires on every PR open with three-tier path scan (Skip/Light/Deep). Read-everything, write-narrowly. Critical findings block merge by social convention, not technical block. See agents/guardian/SPEC.md and CLAUDE.md.",
+
+  "model": "claude-sonnet-5",
+  "modelOverrides": {
+    "_comment": "Per-skill model routing. `conversational` is the lightweight default (coverage/security/perf/compliance Q&A + lookups + routing) — it produces no findings and doesn't load SYSTEM.md/ADR-index/sensitive-paths/compliance-scope/active-reviews, so it runs on Haiku at ~1/3 the token rates; a bare question stays cheap instead of loading heavy context + running a full review on Sonnet. Every review skill (qa/security/llm-security/performance/compliance/design-system) stays on the default Sonnet-5 — review judgment needs the depth.",
+    "conversational": "claude-haiku-4-5-20251001"
+  },
+  "thinking": {
+    "type": "enabled",
+    "budget_tokens": 4000
+  },
+  "max_turns": 30,
+
+  "costCap": {
+    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Guardian fires on every PR open + weekly LLM-security eval. The eval suite is the biggest single expense if AI features exist. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
+    "perJobCostUsd": 5.00,
+    "perJobTokens": 500000,
+    "monthlyCostUsd": 100.00,
+    "monthlyTokensApprox": 8000000,
+    "warnAtPercent": 80,
+    "alertChannel": "#agents-alerts",
+    "onCapReached": "refuse_session",
+    "offHoursThrottling": null
+  },
+
+  "permissions": {
+    "allow": [
+      "_note: allow is not a restriction today. The SDK treats allowedTools as auto-allowed without prompting and says to use the tools option to restrict, which the router does not set yet. So this list documents what the agent actually uses, and it becomes the real boundary the moment tools is wired from it. Write/Edit/TodoWrite are declared here because they were relied on but undeclared, or parked in ask, a tier nothing reads.",
+      "TodoWrite",
+      "WebSearch",
+      "WebFetch",
+      "Read",
+      "Grep",
+      "Glob",
+      "Write",
+      "Edit",
+      "mcp__linear__create_issue",
+      "mcp__linear__create_comment",
+      "mcp__linear__update_issue_labels",
+      "mcp__linear__get_issue",
+      "mcp__linear__list_issues",
+      "mcp__github__get_*",
+      "mcp__github__list_*",
+      "mcp__github__search_*",
+      "mcp__github__create_issue",
+      "mcp__github__create_issue_comment",
+      "mcp__github__create_pull_request_review_comment",
+      "mcp__github__create_pull_request_review",
+      "mcp__github__create_pull_request",
+      "mcp__github__update_pull_request",
+      "mcp__slack__post_to_security_channel",
+      "mcp__slack__post_to_perf_channel",
+      "mcp__slack__post_to_compliance_channel",
+      "mcp__slack__post_to_alerts_channel",
+      "mcp__anthropic__judge_*",
+
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(git status)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push -u origin agent/:*)",
+      "Bash(git push origin agent/:*)",
+
+      "Bash(pnpm test:*)",
+      "Bash(npm test:*)",
+      "Bash(yarn test:*)",
+      "Bash(jest:*)",
+      "Bash(vitest:*)",
+      "Bash(pytest:*)",
+      "Bash(playwright:*)",
+      "Bash(tsc --noEmit:*)",
+      "Bash(eslint:*)",
+
+      "Bash(pnpm audit:*)",
+      "Bash(npm audit:*)",
+      "Bash(yarn audit:*)",
+      "Bash(osv-scanner:*)",
+      "Bash(snyk test:*)",
+
+      "Bash(gitleaks:*)",
+      "Bash(trufflehog:*)",
+      "Bash(detect-secrets:*)",
+
+      "Bash(axe:*)",
+      "Bash(lighthouse:*)",
+
+      "Bash(k6:*)",
+      "Bash(artillery:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "mcp__linear__update_issue_status",
+      "mcp__linear__assign_issue",
+      "mcp__linear__close_issue"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push --no-verify:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(git commit --amend:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git rebase -i:*)",
+      "Bash(git checkout main:*)",
+      "Bash(git checkout staging:*)",
+      "Bash(rm -rf:*)",
+
+      "Bash(docker:*)",
+      "Bash(kubectl:*)",
+      "Bash(terraform:*)",
+      "Bash(pulumi:*)",
+      "Bash(aws:*)",
+      "Bash(gcloud:*)",
+      "Bash(fly deploy:*)",
+
+      "mcp__linear__delete_*",
+      "mcp__linear__archive_*",
+      "mcp__github__merge_pull_request",
+      "mcp__github__delete_*",
+      "mcp__email__send",
+      "mcp__deploy__*",
+      "mcp__secrets__*"
+    ],
+    "defaultMode": "default"
+  },
+
+  "writeScope": {
+    "_comment": "Guardian's write scope is intentionally narrow. Routes substantive fixes to Builders. Direct writes: tests, security/compliance/perf/design-system docs, dep manifests (CVE bumps only), narrow a11y patches, own configs in dev-team repo, own state.",
+    "allowedPaths": [
+      "<target-project>/tests/**",
+      "<target-project>/**/*.spec.ts",
+      "<target-project>/**/*.spec.tsx",
+      "<target-project>/**/*.spec.js",
+      "<target-project>/**/*.test.ts",
+      "<target-project>/**/*.test.tsx",
+      "<target-project>/**/*.test.js",
+      "<target-project>/**/test_*.py",
+      "<target-project>/**/*_test.py",
+
+      "<target-project>/docs/security/**",
+      "<target-project>/docs/compliance/**",
+      "<target-project>/docs/perf/**",
+      "<target-project>/docs/design-system/drift/**",
+
+      "<target-project>/package.json",
+      "<target-project>/package-lock.json",
+      "<target-project>/pnpm-lock.yaml",
+      "<target-project>/yarn.lock",
+      "<target-project>/Cargo.toml",
+      "<target-project>/Cargo.lock",
+      "<target-project>/pyproject.toml",
+      "<target-project>/poetry.lock",
+      "<target-project>/Pipfile.lock",
+      "<target-project>/go.mod",
+      "<target-project>/go.sum",
+
+      "dev-team/agents/guardian/sensitive-paths.yml",
+      "dev-team/agents/guardian/perf-sensitive-paths.yml",
+
+      "dev-team-state/global/guardian/**",
+      "dev-team-state/projects/*/guardian/**"
+    ],
+    "deniedPaths": [
+      "<target-project>/server/**/!(*.spec.*|*.test.*)",
+      "<target-project>/client/**/!(*.spec.*|*.test.*)",
+      "<target-project>/app/**/!(*.spec.*|*.test.*)",
+      "<target-project>/api/**/!(*.spec.*|*.test.*)",
+      "<target-project>/services/**/!(*.spec.*|*.test.*)",
+      "<target-project>/mobile/**/!(*.spec.*|*.test.*)",
+      "<target-project>/.github/**",
+      "<target-project>/Dockerfile*",
+      "<target-project>/docker-compose*.yml",
+      "<target-project>/terraform/**",
+      "<target-project>/pulumi/**",
+      "<target-project>/infra/**",
+      "<target-project>/founding/**",
+      "<target-project>/docs/architecture/**",
+      "<target-project>/docs/adrs/**",
+      "<target-project>/docs/runbooks/**",
+      "<target-project>/docs/incidents/**",
+      "<target-project>/docs/brand/**",
+      "<target-project>/docs/marketing/**",
+      "<target-project>/docs/prds/**",
+      "<target-project>/docs/analysis/**",
+      "<target-project>/docs/research/**",
+      "<target-project>/contracts/**",
+      "<target-project>/migrations/**",
+      "dev-team/agents/strategist/**",
+      "dev-team/agents/builder-server/**",
+      "dev-team/agents/builder-client/**",
+      "dev-team/agents/platform/**",
+      "dev-team/agents/marketer/**",
+      "dev-team/agents/PROTOCOLS.md",
+      "dev-team-state/projects/*/strategist/**",
+      "dev-team-state/projects/*/builder-server/**",
+      "dev-team-state/projects/*/builder-client/**",
+      "dev-team-state/projects/*/platform/**",
+      "dev-team-state/projects/*/marketer/**",
+      "dev-team-state/projects/*/_shared/**"
+    ]
+  },
+
+  "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "Always load: founding docs (the house-style preamble). Small + needed by every skill for project context, so it loads for all sessions incl. the lightweight conversational Q&A default.",
+        "command": "load",
+        "paths": [
+          "<target-project>/founding/PRODUCT.md",
+          "<target-project>/founding/BRAND.md",
+          "<target-project>/founding/STACK.md",
+          "<target-project>/founding/COMPLIANCE.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/founding/COMPLIANCE.md": "ignore"
+        }
+      },
+      {
+        "_comment": "Heavy context — SYSTEM.md + ADR index + sensitive-paths.yml + compliance-scope.yml + design-system.md — loaded ONLY for the review skills that use it. The lightweight `conversational` default (coverage/security/compliance Q&A + lookups) skips this so a one-line answer doesn't cache-write tens-of-K tokens every session; it reads a specific file (sensitive-paths, compliance-scope, an ADR) on demand instead. See load-hook `only_skills`.",
+        "command": "load",
+        "only_skills": ["qa", "security", "llm-security", "performance", "compliance", "design-system"],
+        "paths": [
+          "<target-project>/docs/architecture/SYSTEM.md",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md",
+          "dev-team/agents/guardian/sensitive-paths.yml",
+          "dev-team-state/projects/${PROJECT}/guardian/compliance-scope.yml",
+          "dev-team-state/projects/${PROJECT}/builder-client/design-system.md",
+          "dev-team-state/projects/${PROJECT}/guardian/active-reviews.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/docs/architecture/SYSTEM.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/guardian/compliance-scope.yml": "ignore_early_project",
+          "dev-team-state/projects/${PROJECT}/builder-client/design-system.md": "ignore_early_project",
+          "dev-team-state/projects/${PROJECT}/guardian/active-reviews.md": "ignore_first_session"
+        }
+      },
+      {
+        "_comment": "If founding STACK.md or SYSTEM.md is missing, refuse substantive review work.",
+        "command": "check",
+        "if_missing": [
+          "<target-project>/founding/STACK.md",
+          "<target-project>/docs/architecture/SYSTEM.md"
+        ],
+        "then": "set_context",
+        "context": "stack_or_system_missing=true",
+        "message": "Cannot do substantive review work without STACK.md and SYSTEM.md. Recommend `@strategist-agent kick off Phase 0` and `@platform-agent design the system architecture` first."
+      },
+      {
+        "_comment": "On every PR-triggered session, classify the path tier based on sensitive-paths.yml. Stores the classification in context for skills to consume.",
+        "command": "classify_path_tier",
+        "trigger_only": "pull_request",
+        "result_context": "path_tier"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "Block writes outside the narrow Guardian scopes (tests/, security/compliance/perf docs, dep manifests, own configs, own state).",
+        "tool": "Write",
+        "block_if_path_matches": [
+          "<target-project>/server/**/!(*.spec.*|*.test.*|test_*|*_test)",
+          "<target-project>/client/**/!(*.spec.*|*.test.*|test_*|*_test)",
+          "<target-project>/.github/**",
+          "<target-project>/founding/**",
+          "<target-project>/docs/architecture/**",
+          "<target-project>/docs/adrs/**",
+          "<target-project>/migrations/**",
+          "<target-project>/contracts/**",
+          "dev-team/agents/strategist/**",
+          "dev-team/agents/builder-*/**",
+          "dev-team/agents/platform/**",
+          "dev-team/agents/marketer/**"
+        ],
+        "message": "Guardian's write scope is narrow — tests, security/compliance/perf docs, dep bumps, own configs. Substantive code fixes route to Builders via Linear tickets. This is by design — see CLAUDE.md → Blast radius."
+      },
+      {
+        "_comment": "Block dep manifest writes that aren't pure CVE-driven version bumps. Guardian shouldn't add/remove dependencies, only bump existing ones for security.",
+        "tool": "Edit",
+        "if_path_matches": ["**/package.json", "**/Cargo.toml", "**/pyproject.toml", "**/go.mod"],
+        "validate": "version_bump_only",
+        "on_violation_message": "Guardian's dep-manifest writes are limited to CVE-driven version bumps. Adding/removing dependencies routes to the relevant Builder."
+      },
+      {
+        "_comment": "Block git push to default branches.",
+        "tool": "Bash",
+        "pattern": "git push.*(main|staging|production|prod|master)",
+        "deny_always": true,
+        "message": "🛑 Cannot push to default/protected branches."
+      },
+      {
+        "_comment": "Block bypass attempts.",
+        "tool": "Bash",
+        "patterns": ["--no-verify", "--force(-with-lease)?\\s+origin/(main|staging)"],
+        "deny_always": true,
+        "message": "🛑 Bypass attempts forbidden."
+      },
+      {
+        "_comment": "Block merge.",
+        "tool": "mcp__github__merge_pull_request",
+        "deny_always": true,
+        "message": "Guardian does not merge PRs."
+      }
+    ],
+    "PostToolUse": [
+      {
+        "_comment": "After Edit/Write to a test file, run lint on the changed file.",
+        "tool": ["Edit", "Write"],
+        "if_path_matches": ["**/*.spec.ts", "**/*.spec.tsx", "**/*.test.ts", "**/*.test.tsx", "**/test_*.py"],
+        "command": "lint_and_format",
+        "fix": true
+      }
+    ],
+    "SessionEnd": [
+      {
+        "_comment": "Durability for a session that gets cut off. Work lives in the leased worktree, which outlives the session — but the idle pruner reclaims it. This commits whatever is still uncommitted and pushes it, so a cut-off session leaves a real commit on the agent branch instead of a checkout that gets collected. Skips cleanly when the session leased no worktree.",
+        "command": "git_commit_if_changed",
+        "repo": "<workspace>",
+        "message_template": "[WIP] session ${SESSION_ID} — ${SKILL} (session ended before this was committed)",
+        "push": true
+      },
+      {
+        "_comment": "Commit state changes (findings log, active-reviews, llm-security baseline, etc.).",
+        "command": "git_commit",
+        "repo": "dev-team-state",
+        "paths": [
+          "shared/**",
+        "global/guardian/**",
+          "projects/${PROJECT}/guardian/**"
+        ],
+        "message_template": "[guardian] session ${SESSION_ID} — ${SKILL} on ${PROJECT}",
+        "push": true
+      },
+      {
+        "_comment": "If sensitive-paths.yml or perf-sensitive-paths.yml was modified (Guardian accepted a sensitive-path proposal), open a small PR to the dev-team repo.",
+        "command": "git_commit_if_changed",
+        "repo": "dev-team",
+        "paths": [
+          "agents/guardian/sensitive-paths.yml",
+          "agents/guardian/perf-sensitive-paths.yml"
+        ],
+        "message_template": "[guardian] update sensitive-paths registry — ${REASON}",
+        "create_pr": true,
+        "pr_label": "agent:guardian-bot"
+      }
+    ]
+  },
+
+  "_implementationNotes": {
+    "model": "Sonnet — review work benefits from reasoning depth but not so much that Opus is justified for routine PRs. Opus opt-in for deep security analysis or complex llm-security adversarial design.",
+    "thinking_budget": "4000 tokens — lower than Builders. Review is bounded; long planning isn't usually needed.",
+    "max_turns": "30 — most PR reviews complete in fewer turns than this. Cap protects against runaway loops on deep-tier scans.",
+    "writeScope_narrow_by_design": "Guardian routes substantive findings to Builders rather than fixing them. Direct fixes are limited to dep bumps, narrow a11y patches, design-token swaps, and trivial test additions. This is intentional — Guardian shouldn't be doing Builder work.",
+    "guardian_self_edit_exception": "Guardian CAN modify its own sensitive-paths.yml and perf-sensitive-paths.yml via PRs to dev-team repo. This is the only narrow exception to the 'never edit dev-team config' rule.",
+    "mcp_servers_required": ["linear", "github", "slack", "anthropic (for LLM-as-judge in llm-security skill)"],
+    "future_additions": [
+      "Path-tier classification could move to a Cyrus middleware so all agents see consistent classification — currently each Guardian session classifies independently",
+      "LLM-as-judge using a different model than the one being tested (avoid circular bias)",
+      "Production-sampling for llm-security weekly eval (currently synthetic-only)",
+      "Cross-PR pattern detection (e.g. 3 PRs in a row missing the same kind of test → flag a systemic gap)"
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "_comment": "Platform MCP set — Linear + GitHub + Slack baseline. FinOps reads spend from the router's cost_ledger directly (internal, not MCP). Release Manager uses GitHub MCP for releases. ADR work uses file Read/Edit tools (not MCP). Verify package names before Phase 1 deploy.",
+
+  "mcpServers": {
+    "linear": {
+      "type": "sdk",
+      "_comment": "In-process Linear MCP (mcp__linear__list_teams / list_labels / search_issues / create_issue / create_comment / create_label). Router-hosted wrapper over Linear's GraphQL API, authed with the session's ${LINEAR_TOKEN} (from Infisical LINEAR_TOKEN_platform). Only the always-allowed tier is exposed — status change / reassign / close / archive / delete are intentionally not tools (AGENTS.md tiered Linear scope). Replaces the deprecated @modelcontextprotocol/server-linear stdio package. See router/src/linear/linearMcp.ts. Platform files architectural-review tickets, incident-response tickets, finops cost-related tickets."
+    },
+
+    "github": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-github",
+      "args": [],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_APP_INSTALLATION_TOKEN}"
+      },
+      "_comment": "GitHub MCP — release-manager creates release drafts; architect opens ADR PRs to docs/adrs/; incident-response posts to incident issues. Platform DOES write to GitHub but only to docs paths + the .github/ workflows it owns."
+    },
+
+    "slack": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-slack",
+      "args": [],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
+      },
+      "_comment": "Slack MCP — FinOps posts to #agents-alerts; release-manager posts to #engineering; incident-response posts to #incidents."
+    }
+  },
+
+  "_future_mcp_candidates": {
+    "_comment": "Possible additions during Phase 3+ once toolbelt decisions land. NOT enabled at v1 — each requires verification + the right credentials in Infisical.",
+    "stripe": "If billing infrastructure uses Stripe, FinOps could pull subscription cost data via @modelcontextprotocol/server-stripe.",
+    "anthropic-admin": "If Anthropic ships an admin/billing MCP, FinOps could pull spend data directly (currently router pulls from cost_ledger SQLite).",
+    "cloud-provider": "If the project uses AWS/GCP/Hetzner heavily, a cloud-billing MCP can feed cloud-cost data into FinOps reports. Per-project decision."
+  }
+}

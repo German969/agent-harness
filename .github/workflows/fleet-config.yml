@@ -1,0 +1,75 @@
+name: fleet-config
+
+# Validation gate for AGENT config — the half of this repo ci.yml does not cover.
+#
+# ci.yml filters on `router/**`, and agent config reaches production through the
+# git-pull sidecar rather than a deploy (deploy.yml's paths filter excludes it too,
+# because CLAUDE.md / settings.json / skills / mcp.json are re-read per session).
+# So until this workflow, nothing checked agent config before it ran — and two
+# defects shipped straight through the gap:
+#
+#   - `agent-architect.md` prescribed `model: claude-sonnet-4-7`, which is not a
+#     model. An agent onboarded with it bills at the most expensive rate in the
+#     table against its cap and gets refused at a fraction of its budget.
+#   - Both Builders' `<workspace>` hook was set `push: true` against a handler with
+#     no push support, so the truncation-durability commit never left the worktree.
+#
+# Deliberately a separate workflow rather than a job in ci.yml: `on.paths` is
+# workflow-level, so sharing a file would mean running the full router suite on
+# every prose edit to an agent's CLAUDE.md, or skipping this on an agents/ edit.
+# Both are wrong. Keeping it separate also leaves ci.yml's `workflow_call` contract
+# with deploy.yml untouched.
+
+on:
+  pull_request:
+    paths:
+      - 'agents/**'
+      - 'identities/**'
+      - 'router/src/config/**'
+      - 'router/src/hooks/registry.ts'
+      - 'router/src/runtime/modelRates.ts'
+      - 'router/src/runtime/modelCheck.ts'
+      - 'router/scripts/validate-fleet-config.ts'
+      - '.github/workflows/fleet-config.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'agents/**'
+      - 'identities/**'
+      - 'router/src/config/**'
+      - 'router/src/hooks/registry.ts'
+      - 'router/src/runtime/modelRates.ts'
+      - 'router/src/runtime/modelCheck.ts'
+      - 'router/scripts/validate-fleet-config.ts'
+      - '.github/workflows/fleet-config.yml'
+
+concurrency:
+  group: fleet-config-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: agent config · identities · model rates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Matches ci.yml and `corepack prepare pnpm@…` in deploy/Dockerfile.
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the `node:20.10.0-bookworm-slim` base image in deploy/Dockerfile.
+          node-version: 20.10.0
+          cache: pnpm
+          cache-dependency-path: router/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: router
+
+      - name: validate fleet config
+        run: pnpm validate:fleet
+        working-directory: router

@@ -1,0 +1,79 @@
+# identities/guardian.yml
+#
+# Guardian's bot identity + routing rules. See identities/README.md.
+# Placeholder values are `~`; real values fill in during Phase 5.
+#
+# IMPORTANT: Guardian uniquely uses github_auto_triggers — it auto-fires on
+# every PR open in the target project (three-tier path scan; see Guardian
+# CLAUDE.md). This is the only agent with that behavior.
+
+agent: guardian
+
+# ============================================================================
+# GitHub App identity
+# ============================================================================
+github:
+  app_slug: guardian-bot
+  app_id: ~
+  bot_username: guardian-bot[bot]
+  installation_url: ~
+
+# ============================================================================
+# Linear agent identity
+# ============================================================================
+linear:
+  agent_handle: guardian-bot
+  agent_id: ~
+  user_id: ~
+
+# ============================================================================
+# Slack app identity
+# ============================================================================
+slack:
+  app_id: ~
+  bot_user_id: ~
+  team_id: ~                                                # 'T...' workspace id - required by the slack MCP (${SLACK_TEAM_ID}); fill at deploy
+  channels:
+    primary:
+      - "#security"                               # security + llm-security findings
+      - "#compliance"                             # compliance audit reports
+      - "#engineering"                            # qa + perf + design-system findings
+    alerts: "#agents-alerts"
+
+# ============================================================================
+# Routing rules
+# ============================================================================
+routing:
+  linear_labels:
+    - security                                    # security skill
+    - qa                                          # qa skill
+    - perf                                        # performance skill
+    - compliance                                  # compliance skill
+    - llm-security                                # llm-security skill (focused redteam)
+    - legal-review                                # compliance skill
+    - threat-model                                # security skill (focused threat-model)
+    - guardian-bot                                # explicit routing-by-label
+  slack_default_channels:
+    - "#security"                                 # default channel for Guardian-relevant messages
+  # The auto-fire behavior — Guardian is the only agent with this
+  github_auto_triggers:
+    - pull_request.opened                         # three-tier path scan kicks in
+    - pull_request.synchronize                    # push to existing PR triggers re-scan
+    - pull_request.reopened                       # reopened PR triggers scan
+
+# ============================================================================
+# Conversation continuity
+# ============================================================================
+continuation_timeout_days: 30
+
+# ============================================================================
+# Secret references
+# ============================================================================
+secrets:
+  github_app_private_key: GITHUB_APP_PRIVATE_KEY_guardian
+  github_webhook_secret: GITHUB_APP_WEBHOOK_SECRET_guardian
+  linear_token: LINEAR_TOKEN_guardian
+  linear_webhook_secret: LINEAR_WEBHOOK_SECRET_guardian
+  slack_bot_token: SLACK_BOT_TOKEN_guardian
+  slack_signing_secret: SLACK_SIGNING_SECRET_guardian
+  anthropic_api_key: ANTHROPIC_API_KEY

@@ -1,0 +1,114 @@
+# identities/harness.yml
+#
+# Harness's bot identity + routing rules. See identities/README.md for the contract.
+# Placeholder values are `~`; real values fill in during Phase 2 (Harness deploy wave,
+# alongside Strategist).
+#
+# IMPORTANT: Harness is the only agent that mutates dev-team/. Its GitHub App is
+# installed on the dev-team repo (and ONLY the dev-team repo — not on target
+# project repos).
+
+agent: harness
+
+# ============================================================================
+# GitHub App identity
+# ============================================================================
+github:
+  app_slug: dev-team-harness                      # https://github.com/apps/dev-team-harness
+  app_id: 123456                                 # numeric App ID
+  bot_username: harness-agent                     # display name in reply footers (parallel to strategist-agent)
+  installation_url: https://github.com/apps/dev-team-harness/installations/7654321
+  # Harness only installs on the dev-team repo. Target projects are off-limits.
+  installations:
+    dev_team_repo: 7654321                      # installation_id for dev-team repo
+  # PRs Harness opens auto-receive these labels (some apply conditionally per the
+  # SessionEnd hook's auto_apply_conditional_labels rules in settings.json):
+  default_pr_labels:
+    - "agent:harness-bot"
+  conditional_pr_labels:
+    - label: meta-self-modify
+      condition: "PR touches agents/harness/**"
+    - label: router-change
+      condition: "PR touches router/src/**"
+    - label: cross-agent
+      condition: "PR touches files for 2+ agents"
+    - label: urgent
+      condition: "session activated misbehavior-debugger skill"
+
+# ============================================================================
+# Linear agent identity
+# ============================================================================
+linear:
+  agent_handle: harness-bot
+  agent_id: ~
+  user_id: ~
+
+# ============================================================================
+# Slack app identity
+# ============================================================================
+slack:
+  app_id: A0123ABCDEF
+  bot_user_id: U0123ABCDEF
+  team_id: T0123ABCDEF                              # workspace id — consumed by the slack MCP as ${SLACK_TEAM_ID}
+  channels:
+    primary:
+      - "#harness-engineering"                    # dedicated channel for meta-work; primary
+      - "#agents-alerts"                          # escalation channel
+    # Harness also posts to agent-specific channels when its changes materially
+    # affect those agents (so future sessions of those agents see the heads-up).
+    #
+    # NOTE (drift risk, guarded): this map DUPLICATES each agent's own
+    # `slack.channels.primary` (see identities/<agent>.yml). If an agent moves its
+    # primary channel, this map goes stale and Harness would crosspost to the wrong
+    # channel. A drift guard now catches that: `checkCrosspostsDrift`
+    # (router/src/routing/crossposts.ts) runs at router boot and logs a warning for
+    # any crosspost that diverges from an agent's primary / targets an unknown agent /
+    # is missing for a Slack-enabled agent, and a test asserts these shipped
+    # identities stay in sync (router/tests/routing/crossposts.test.ts). Longer-term
+    # ideal is still to derive the target at runtime from the affected agent's own
+    # identity (single source of truth) and drop this map entirely.
+    crossposts:
+      strategist: "#engineering"
+      platform: "#engineering"
+      builder-server: "#engineering"
+      builder-client: "#engineering"
+      guardian: "#security"
+      marketer: "#marketing"
+    alerts: "#agents-alerts"
+
+# ============================================================================
+# Routing rules
+# ============================================================================
+routing:
+  linear_labels:
+    - harness                                     # generic Harness work
+    - agent-improvement                           # → agent-modifier skill
+    - agent-misbehavior                           # → misbehavior-debugger skill
+    - meta                                        # generic meta-work
+    - gap-analysis                                # → gap-analyzer skill (on-demand)
+    - new-agent                                   # → agent-architect skill
+    - new-skill                                   # → skill-author skill
+    - router-change                               # → router-engineer skill
+    - harness-bot                                 # explicit routing-by-label
+  slack_default_channels:
+    - "#harness-engineering"                      # channel-default routing
+  github_auto_triggers: []                        # Harness does NOT auto-fire on target-project PRs.
+                                                  # (PRs on the dev-team repo itself are reviewed by humans,
+                                                  # not by Harness.)
+
+# ============================================================================
+# Conversation continuity
+# ============================================================================
+continuation_timeout_days: 30                     # multi-day agent-authoring threads OK within 30d window
+
+# ============================================================================
+# Secret references (NAMES only — values in Infisical)
+# ============================================================================
+secrets:
+  github_app_private_key: GITHUB_APP_PRIVATE_KEY_harness
+  github_webhook_secret: GITHUB_APP_WEBHOOK_SECRET_harness
+  linear_token: LINEAR_TOKEN_harness
+  linear_webhook_secret: LINEAR_WEBHOOK_SECRET_harness
+  slack_bot_token: SLACK_BOT_TOKEN_harness
+  slack_signing_secret: SLACK_SIGNING_SECRET_harness
+  anthropic_api_key: ANTHROPIC_API_KEY

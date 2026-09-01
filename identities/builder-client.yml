@@ -1,0 +1,81 @@
+# identities/builder-client.yml
+#
+# Builder-Client's bot identity + routing rules. See identities/README.md.
+# Placeholder values are `~`; real values fill in during Phase 4.
+#
+# IMPORTANT: Builder-Client's GitHub App is installed on TWO repos: the target
+# project (for UI code) AND the <target-project>-marketing repo (for screenshot
+# library writes per Protocol #4). The App is the same; two installations.
+# Both installation IDs land here once created.
+
+agent: builder-client
+
+# ============================================================================
+# GitHub App identity
+# ============================================================================
+github:
+  app_slug: dev-team-builder-client                 # https://github.com/apps/dev-team-builder-client
+  app_id: 123456                                   # numeric App ID
+  bot_username: client-agent                        # display name in reply footers + GitHub @-mention matching
+  installation_url: https://github.com/apps/dev-team-builder-client/installations/7654321
+  installations:
+    target_project: 7654321                       # installation_id on German969/chatbots (the target project)
+  # A marketing_repo installation was originally planned here as a second entry.
+  # Deliberately NOT added: the marketing repo does not exist yet, AND
+  # consumer.ts → buildGithubAppOptions currently returns the FIRST numeric
+  # installation it finds rather than mapping source repo → installation. Adding a
+  # second entry today would make which installation is used depend on YAML key
+  # order. Add it only alongside that router fix.
+
+# ============================================================================
+# Linear agent identity
+# ============================================================================
+linear:
+  agent_handle: client-bot
+  agent_id: ~
+  user_id: ~
+
+# ============================================================================
+# Slack app identity
+# ============================================================================
+slack:
+  app_id: ~
+  bot_user_id: ~
+  team_id: ~                                                # 'T...' workspace id - required by the slack MCP (${SLACK_TEAM_ID}); fill at deploy
+  channels:
+    primary:
+      - "#engineering"                            # frontend status + visual review posts
+      - "#marketing"                              # screenshot-delivery acknowledgments to Marketer
+    alerts: "#agents-alerts"
+
+# ============================================================================
+# Routing rules
+# ============================================================================
+routing:
+  linear_labels:
+    - frontend                                    # default frontend skill
+    - design                                      # claude-design-prefill / claude-design-handoff
+    - mobile                                      # mobile skill
+    - a11y                                        # a11y skill
+    - screenshot                                  # screenshots skill (Protocol #4)
+    - needs-design                                # held until claude-design-prefill resolves
+    - client-bot                                  # explicit routing-by-label
+  slack_default_channels: []
+  github_auto_triggers: []
+
+# ============================================================================
+# Conversation continuity
+# ============================================================================
+continuation_timeout_days: 30
+
+# ============================================================================
+# Secret references
+# ============================================================================
+secrets:
+  github_app_private_key: GITHUB_APP_PRIVATE_KEY_builder_client
+  github_webhook_secret: GITHUB_APP_WEBHOOK_SECRET_builder_client
+  linear_token: LINEAR_TOKEN_builder_client
+  linear_webhook_secret: LINEAR_WEBHOOK_SECRET_builder_client
+  slack_bot_token: SLACK_BOT_TOKEN_builder_client
+  slack_signing_secret: SLACK_SIGNING_SECRET_builder_client
+  anthropic_api_key: ANTHROPIC_API_KEY

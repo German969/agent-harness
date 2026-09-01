@@ -1,0 +1,43 @@
+{
+  "_comment": "Guardian MCP set — Linear + GitHub + Slack baseline. Security scanners (gitleaks, trufflehog, snyk, osv-scanner), a11y tools (axe, lighthouse), perf tools (k6, artillery) are all Bash commands in settings.json — not MCPs. The LLM-as-judge mechanism used by the llm-security skill is router-mediated (a sub-session call), not an MCP. Verify package names before Phase 1 deploy.",
+
+  "mcpServers": {
+    "_linear": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-linear"],
+      "env": {
+        "LINEAR_API_KEY": "${LINEAR_TOKEN}"
+      },
+      "_comment": "Linear MCP — Guardian files security/qa/compliance/perf findings as Linear tickets, severity-labeled, routed to the relevant Builder (or human for legal-review). Adds Curator-relayed tickets when sensitive-paths.yml updates are needed."
+    },
+
+    "github": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-github",
+      "args": [],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_APP_INSTALLATION_TOKEN}"
+      },
+      "_comment": "GitHub MCP — Guardian posts unified review comments on every PR, opens dep-CVE bump PRs (narrow remediation scope), opens PRs to dev-team to update sensitive-paths.yml when accepting candidates via the Sensitive-Paths Protocol. Guardian NEVER merges PRs (denied by settings.json)."
+    },
+
+    "slack": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-slack",
+      "args": [],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
+      },
+      "_comment": "Slack MCP — post P0 findings to #security; weekly llm-security summary to #security; monthly compliance audit summary to #compliance; weekly dep-CVE summary to #security."
+    }
+  },
+
+  "_future_mcp_candidates": {
+    "_comment": "Possible additions during Phase 5+. NOT enabled at v1.",
+    "snyk": "Snyk MCP could replace the Bash(snyk test:*) invocation with a richer query surface. Useful when Guardian needs to read historical scan data, not just run a new scan.",
+    "sentry-readonly": "If the project's app reports errors to Sentry, an MCP for reading recent production errors could enrich Guardian's review (e.g. 'this code path is implicated in a recurring prod error — flag harder').",
+    "llm-as-judge-mcp": "If LLM-as-judge gets used heavily by llm-security, wrapping it as a dedicated MCP server (rather than the router-mediated sub-session approach) could be cleaner. Performance/cost tradeoff — revisit after first 30 days."
+  }
+}

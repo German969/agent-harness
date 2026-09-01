@@ -1,0 +1,240 @@
+#!/usr/bin/env tsx
+//
+// Fleet config gate. Agent config is not covered by ci.yml — its paths filter is
+// `router/**` — and it reaches production through the git-pull sidecar rather than
+// a deploy, so until now NOTHING checked it before it ran.
+//
+// That is not theoretical. Two defects shipped straight through the gap:
+//   - `agent-architect.md` prescribed `model: claude-sonnet-4-7`, which is not a
+//     model. An agent onboarded with it would bill at the most expensive rate in
+//     the table against its cost cap and be refused at a fraction of its budget.
+//   - Both Builders' `<workspace>` hook was set `push: true` against a handler with
+//     no push support, so the truncation-durability commit was never pushed.
+//
+// Checks, in the order a person would ask them:
+//   1. Every agent directory loads — settings.json and mcp.json pass their schemas.
+//   2. Every hook command has a registered handler (the hook schema is open-shaped
+//      on purpose, so a typo validates fine and then silently does nothing).
+//   3. Every model, including per-skill overrides, is priced by the rate table.
+//   4. Identity files parse, and agents and identities correspond 1:1 — an identity
+//      with no agent directory routes events to a config that cannot load, and an
+//      agent with no identity can never be routed to at all.
+//
+// Exits non-zero listing every problem found, rather than stopping at the first:
+// fixing config one CI run at a time is how a five-minute edit becomes an hour.
+
+import { readdirSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadAgentConfig } from '../src/config/agentLoader.js';
+import {
+  STUB_HANDLERS,
+  getSessionHandler,
+  getToolCallHandler,
+  inferCommand,
+} from '../src/hooks/registry.js';
+import { loadIdentities } from '../src/routing/loader.js';
+import { auditFleetModels } from '../src/runtime/modelCheck.js';
+import { builtinToolsFrom } from '../src/runtime/toolAllowlist.js';
+import type { AgentId } from '../src/types.js';
+
+// Not `import.meta.dirname`: that landed in Node 20.11, and CI pins 20.10.0 to match
+// deploy/Dockerfile's base image, where it is undefined. fileURLToPath works on both.
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const problems: string[] = [];
+
+function listAgentDirs(): AgentId[] {
+  const dir = join(repoRoot, 'agents');
+  return readdirSync(dir)
+    .filter((name) => {
+      try {
+        return statSync(join(dir, name)).isDirectory();
+      } catch {
+        return false;
+      }
+    })
+    .sort() as AgentId[];
+}
+
+const agents = listAgentDirs();
+if (agents.length === 0) problems.push('agents/: no agent directories found');
+
+/**
+ * Hooks that are configured but reach no handler, and so do nothing. These are a
+ * KNOWN backlog, not an accepted state — several are guards (an explicit-human-
+ * command gate on both Builders, a URL gate on Marketer, a deny-pattern re-check on
+ * Platform) whose config reads as protection that is not there.
+ *
+ * Listed here so the gate is a ratchet rather than a wall: the existing set is
+ * enumerated and visible, and any NEW dead hook fails CI. Delete an entry when its
+ * handler lands — a stale entry here is itself reported below.
+ */
+const KNOWN_DEAD_HOOKS = new Set([
+  // Explicit `command` values with no handler.
+  'guardian/SessionStart/classify_path_tier',
+]);
+
+/**
+ * Hooks wired to a handler that is a STUB — registered, but it logs and returns
+ * without doing the thing. Tracked separately from the no-handler list because the
+ * failure looks different from the outside (the hook "resolves") while the effect
+ * is identical: the guard or the formatting the config promises does not happen.
+ *
+ * Empty. It stays a ratchet: a newly stubbed hook fails until it is listed here
+ * deliberately, and an entry that stops applying is reported so this shrinks.
+ */
+const KNOWN_STUBBED_HOOKS = new Set<string>();
+
+// 1 + 2 — configs load, and every hook command actually resolves to a handler.
+// The hook schema is open-shaped on purpose (Phase 6b validates per command), so a
+// typo passes zod and then silently does nothing.
+const TOOL_CALL_PHASES = new Set(['PreToolUse', 'PostToolUse']);
+const deadFound = new Set<string>();
+const stubbedFound = new Set<string>();
+for (const agent of agents) {
+  try {
+    const config = loadAgentConfig(agent, { devTeamRoot: repoRoot });
+    for (const [phase, entries] of Object.entries(config.settings.hooks)) {
+      for (const entry of entries as Array<Record<string, unknown>>) {
+        const command = inferCommand(entry);
+        const id =
+          command === undefined
+            ? `${agent}/${phase}/shape:${Object.keys(entry)
+                .filter((k) => k !== '_comment')
+                .sort()
+                .join(',')}`
+            : `${agent}/${phase}/${command}`;
+        const resolved =
+          command !== undefined &&
+          (TOOL_CALL_PHASES.has(phase)
+            ? getToolCallHandler(command) !== undefined
+            : getSessionHandler(command) !== undefined);
+        if (resolved) {
+          if (command === undefined || !STUB_HANDLERS.has(command)) continue;
+          stubbedFound.add(id);
+          if (KNOWN_STUBBED_HOOKS.has(id)) continue;
+          problems.push(
+            `${agent}: hooks.${phase} command '${command}' resolves to a STUB handler — it logs and returns without doing the work`,
+          );
+          continue;
+        }
+
+        deadFound.add(id);
+        if (KNOWN_DEAD_HOOKS.has(id)) continue;
+        problems.push(
+          command === undefined
+            ? `${agent}: hooks.${phase} entry matches no handler shape — it is a no-op (${id})`
+            : `${agent}: hooks.${phase} command '${command}' has no registered handler — it is a no-op`,
+        );
+      }
+    }
+  } catch (err) {
+    problems.push(`${agent}: ${(err as Error).message}`);
+  }
+}
+
+// A handler that landed makes its allowlist entry stale. Report it, so the backlog
+// shrinks as things are fixed instead of quietly keeping a permanent exemption.
+for (const known of KNOWN_DEAD_HOOKS) {
+  if (!deadFound.has(known)) {
+    problems.push(`KNOWN_DEAD_HOOKS entry '${known}' no longer applies — remove it from the list`);
+  }
+}
+for (const known of KNOWN_STUBBED_HOOKS) {
+  if (!stubbedFound.has(known)) {
+    problems.push(
+      `KNOWN_STUBBED_HOOKS entry '${known}' no longer applies — remove it from the list`,
+    );
+  }
+}
+
+// 2b — `permissions.ask` reaches nothing. sdkCall passes only `permissions.allow`
+// (allowedTools) and `permissions.deny` (deniedTools); no code anywhere in
+// router/src reads `ask`. A tool listed ONLY under `ask` is therefore not gated
+// behind a human prompt — it is simply absent, because it never enters
+// allowedTools. That direction is fail-safe, so this reports rather than fails;
+// what it must not do is stay invisible, since the config reads as a working
+// human-in-the-loop tier that does not exist.
+const askOnly: string[] = [];
+for (const agent of agents) {
+  try {
+    const { permissions } = loadAgentConfig(agent, { devTeamRoot: repoRoot }).settings;
+    const allow = new Set(permissions.allow);
+    for (const tool of permissions.ask ?? []) {
+      if (!tool.startsWith('_') && !allow.has(tool)) askOnly.push(`${agent}: ${tool}`);
+    }
+  } catch {
+    // Already reported above.
+  }
+}
+if (askOnly.length > 0) {
+  console.warn(
+    `note: ${askOnly.length} tool(s) are listed only under permissions.ask, which nothing reads — they are unavailable, not gated:`,
+  );
+  for (const entry of askOnly) console.warn(`  - ${entry}`);
+}
+
+// 2c — permissions.allow is now a REAL restriction: it becomes the SDK's `tools`,
+// which is the base set of built-ins a session gets. So a tool dropped from an
+// allow list is a tool the agent no longer has.
+//
+// This check lives here rather than only in toolAllowlist.test.ts because of which
+// workflow runs when: ci.yml filters on `router/**`, so an edit to
+// agents/*/settings.json ALONE never runs the vitest suite — the exact change this
+// guards against would have skipped its own guard.
+const REQUIRED_BUILTINS = ['Read', 'Grep', 'Glob', 'Bash', 'Write', 'Edit'];
+for (const agent of agents) {
+  let allow: readonly string[];
+  try {
+    allow = loadAgentConfig(agent, { devTeamRoot: repoRoot }).settings.permissions.allow;
+  } catch {
+    continue; // Already reported above.
+  }
+  const tools = builtinToolsFrom(allow);
+  if (!tools) {
+    problems.push(
+      `${agent}: permissions.allow names no built-in tools, so the session would fall back to unrestricted`,
+    );
+    continue;
+  }
+  for (const required of REQUIRED_BUILTINS) {
+    if (!tools.includes(required)) {
+      problems.push(
+        `${agent}: permissions.allow does not include '${required}' — with TOOL_ALLOWLIST_ENABLED the agent would not have it`,
+      );
+    }
+  }
+}
+
+// 3 — every configured model is priced. auditFleetModels logs the detail; we only
+// need the count here, and it re-reports agents whose config failed above.
+const unpriced = auditFleetModels(agents, repoRoot, {
+  warn: (obj, msg) => problems.push(`${JSON.stringify(obj)} ${msg}`),
+});
+if (unpriced > 0) problems.push(`${unpriced} configured model(s) are not in the rate table`);
+
+// 4 — identities parse, and correspond to agent directories both ways.
+const { identities, errors } = loadIdentities(join(repoRoot, 'identities'));
+for (const e of errors) problems.push(`identities/${e.file}: ${e.reason}`);
+if (identities.length === 0) problems.push('identities/: none loaded');
+
+const agentSet = new Set<string>(agents);
+const identitySet = new Set(identities.map((i) => i.agent));
+for (const id of identitySet) {
+  if (!agentSet.has(id)) problems.push(`identity '${id}' has no agents/${id}/ directory`);
+}
+for (const agent of agentSet) {
+  if (!identitySet.has(agent as AgentId)) {
+    problems.push(`agents/${agent}/ has no identities/${agent}.yml — it can never be routed to`);
+  }
+}
+
+if (problems.length > 0) {
+  console.error(`fleet config invalid — ${problems.length} problem(s):\n`);
+  for (const p of problems) console.error(`  - ${p}`);
+  process.exit(1);
+}
+
+console.log(
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced`,
+);

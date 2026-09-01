@@ -1,0 +1,68 @@
+# identities/builder-server.yml
+#
+# Builder-Server's bot identity + routing rules. See identities/README.md.
+# Placeholder values are `~`; real values fill in during Phase 4.
+
+agent: builder-server
+
+# ============================================================================
+# GitHub App identity
+# ============================================================================
+github:
+  app_slug: dev-team-builder-server                 # https://github.com/apps/dev-team-builder-server
+  app_id: 123456                                   # numeric App ID
+  bot_username: server-agent                        # display name in reply footers + GitHub @-mention matching
+  installation_url: https://github.com/apps/dev-team-builder-server/installations/7654321
+  installations:
+    target_project: 7654321                       # installation_id on German969/chatbots (the target project)
+
+# ============================================================================
+# Linear agent identity
+# ============================================================================
+linear:
+  agent_handle: server-bot
+  agent_id: ~
+  user_id: ~
+
+# ============================================================================
+# Slack app identity
+# ============================================================================
+slack:
+  app_id: ~
+  bot_user_id: ~
+  team_id: ~                                                # 'T...' workspace id - required by the slack MCP (${SLACK_TEAM_ID}); fill at deploy
+  channels:
+    primary:
+      - "#engineering"                            # all backend status posts here
+    alerts: "#agents-alerts"
+
+# ============================================================================
+# Routing rules
+# ============================================================================
+routing:
+  linear_labels:
+    - backend                                     # default backend skill
+    - api                                         # contract-design skill
+    - ai                                          # ai-specialist skill
+    - data-engineer                               # data-engineer skill (analytics instrumentation, ETL)
+    - migration                                   # backend skill, migration-specific
+    - server-bot                                  # explicit routing-by-label
+  slack_default_channels: []
+  github_auto_triggers: []                        # Builders fire on assignment + mention, not auto-PR-open
+
+# ============================================================================
+# Conversation continuity
+# ============================================================================
+continuation_timeout_days: 30                     # PR threads can be long; 30d covers most
+
+# ============================================================================
+# Secret references
+# ============================================================================
+secrets:
+  github_app_private_key: GITHUB_APP_PRIVATE_KEY_builder_server
+  github_webhook_secret: GITHUB_APP_WEBHOOK_SECRET_builder_server
+  linear_token: LINEAR_TOKEN_builder_server
+  linear_webhook_secret: LINEAR_WEBHOOK_SECRET_builder_server
+  slack_bot_token: SLACK_BOT_TOKEN_builder_server
+  slack_signing_secret: SLACK_SIGNING_SECRET_builder_server
+  anthropic_api_key: ANTHROPIC_API_KEY

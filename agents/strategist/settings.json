@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Strategist agent — internal-facing brain. Read-only on code, tiered Linear writes, doc writes only. See agents/strategist/SPEC.md and CLAUDE.md.",
+
+  "model": "claude-sonnet-5",
+  "modelOverrides": {
+    "_comment": "Per-skill model routing. `conversational` is the lightweight default (Q&A / lookups / routing) — it doesn't produce artifacts, so it runs on Haiku at ~1/3 the token rates (cache-write $1.25/M vs Sonnet 5's $2.50/M). A bare cold question drops from ~$0.24 to ~$0.08. Artifact skills (pm/ba/researcher/founding/curator/triage/design-prefill/pjm) stay on the default Sonnet-5 for synthesis quality. `memo` (explicit 'log to memory' writes) is deliberately NOT overridden here — it inherits the default Sonnet-5, because Haiku confabulates state writes instead of calling the Write tool. Keep memory-writes off Haiku.",
+    "conversational": "claude-haiku-4-5-20251001"
+  },
+  "thinking": {
+    "type": "enabled",
+    "budget_tokens": 8000
+  },
+  "max_turns": 40,
+
+  "costCap": {
+    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Strategist is mostly text generation (PRDs, research, analysis) — lighter than the Builders. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol for the full schema.",
+    "perJobCostUsd": 3.0,
+    "perJobTokens": 400000,
+    "monthlyCostUsd": 60.0,
+    "monthlyTokensApprox": 5000000,
+    "warnAtPercent": 80,
+    "alertChannel": "#agents-alerts",
+    "onCapReached": "refuse_session",
+    "offHoursThrottling": null
+  },
+
+  "permissions": {
+    "allow": [
+      "_note: allow is not a restriction today. The SDK treats allowedTools as auto-allowed without prompting and says to use the tools option to restrict, which the router does not set yet. So this list documents what the agent actually uses, and it becomes the real boundary the moment tools is wired from it. Write/Edit/TodoWrite are declared here because they were relied on but undeclared, or parked in ask, a tier nothing reads.",
+      "Write",
+      "Edit",
+      "TodoWrite",
+      "Read",
+      "Grep",
+      "Glob",
+      "WebSearch",
+      "WebFetch",
+      "mcp__linear__*",
+      "mcp__github__get_*",
+      "mcp__github__list_*",
+      "mcp__github__search_*",
+      "mcp__github__create_issue",
+      "mcp__github__create_issue_comment",
+      "mcp__github__create_pull_request_review_comment",
+      "mcp__slack__*",
+      "mcp__analytics__read_*",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(git status)"
+    ],
+    "_ask_comment": "The gated Linear mutation tools (move_issue / set_milestone / assign_issue / set_due_date / close_issue) are authorized structurally: the router only EXPOSES them in a human-command session (explicit @-mention on this agent, gated_mutations:true in mcp.json). Listed here to document the gated surface; delete/archive remain denied below and have no tool.",
+    "ask": [
+      "mcp__github__create_pull_request",
+      "mcp__linear__move_issue",
+      "mcp__linear__set_milestone",
+      "mcp__linear__assign_issue",
+      "mcp__linear__set_due_date",
+      "mcp__linear__close_issue"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(git reset:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm install:*)",
+      "Bash(yarn:*)",
+      "Bash(docker:*)",
+      "Bash(kubectl:*)",
+      "Bash(terraform:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "mcp__linear__delete_*",
+      "mcp__linear__archive_*",
+      "mcp__github__merge_pull_request",
+      "mcp__github__delete_*",
+      "mcp__email__send",
+      "mcp__slack__send_message_to_channel",
+      "mcp__social__post_*",
+
+      "mcp__github__create_repository",
+      "mcp__github__fork_repository",
+      "mcp__github__search_repositories",
+      "mcp__github__search_users",
+      "mcp__github__list_commits",
+      "mcp__github__update_issue",
+      "mcp__github__create_pull_request_review",
+      "mcp__github__update_pull_request_branch",
+      "mcp__github__get_pull_request_files",
+      "mcp__github__get_pull_request_status",
+      "mcp__github__get_pull_request_reviews",
+      "mcp__github__get_pull_request_comments",
+      "NotebookEdit"
+    ],
+    "defaultMode": "default"
+  },
+
+  "writeScope": {
+    "_comment": "Strategist writes to its own docs domains (PRDs / analysis / research) + founding (only via founding skill) + own state + shared strategist-marketer surface. Explicitly denied from other agents' docs domains (architecture/adrs/runbooks/incidents = Platform; security/compliance/perf = Guardian; brand/marketing = Marketer).",
+    "allowedPaths": [
+      "<target-project>/docs/prds/**",
+      "<target-project>/docs/analysis/**",
+      "<target-project>/docs/research/**",
+      "<target-project>/founding/**",
+      "dev-team-state/global/strategist/**",
+      "dev-team-state/projects/*/strategist/**",
+      "dev-team-state/projects/*/_shared/strategist-marketer/**"
+    ],
+    "deniedPaths": [
+      "<target-project>/server/**",
+      "<target-project>/client/**",
+      "<target-project>/app/**",
+      "<target-project>/web/**",
+      "<target-project>/api/**",
+      "<target-project>/.github/**",
+      "<target-project>/Dockerfile*",
+      "<target-project>/docker-compose*.yml",
+      "<target-project>/docs/architecture/**",
+      "<target-project>/docs/adrs/**",
+      "<target-project>/docs/runbooks/**",
+      "<target-project>/docs/incidents/**",
+      "<target-project>/docs/security/**",
+      "<target-project>/docs/compliance/**",
+      "<target-project>/docs/perf/**",
+      "<target-project>/docs/brand/**",
+      "<target-project>/docs/marketing/**",
+      "<target-project>/docs/design-system/**",
+      "dev-team/agents/**",
+      "dev-team-state/projects/*/builder-server/**",
+      "dev-team-state/projects/*/builder-client/**",
+      "dev-team-state/projects/*/platform/**",
+      "dev-team-state/projects/*/guardian/**",
+      "dev-team-state/projects/*/marketer/**"
+    ]
+  },
+
+  "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "Always load: founding docs (the house-style preamble). Small + needed by every skill for project context, so it loads for all sessions incl. lightweight conversational Q&A.",
+        "command": "load",
+        "paths": [
+          "<target-project>/founding/PRODUCT.md",
+          "<target-project>/founding/BRAND.md",
+          "<target-project>/founding/STACK.md",
+          "<target-project>/founding/COMPLIANCE.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/founding/COMPLIANCE.md": "ignore"
+        }
+      },
+      {
+        "_comment": "Heavy context — architecture + ADR index + state — loaded ONLY for the artifact-producing skills that use it. The lightweight `conversational` default skill (bare Q&A / lookups) skips this so a one-line answer doesn't pay to cache-write ~tens-of-K tokens every session. See load-hook `only_skills`.",
+        "command": "load",
+        "only_skills": [
+          "pm",
+          "ba",
+          "researcher",
+          "curator",
+          "pjm",
+          "triage",
+          "design-prefill",
+          "founding"
+        ],
+        "paths": [
+          "<target-project>/docs/architecture/SYSTEM.md",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md",
+          "dev-team-state/global/strategist/recent-decisions.md",
+          "dev-team-state/projects/${PROJECT}/strategist/active-prds.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/docs/architecture/SYSTEM.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md": "ignore_pre_phase_3"
+        }
+      },
+      {
+        "_comment": "Memo skill (explicit 'log this to memory' requests) needs its decisions file + exact path so the append is clean — but NOT the heavy architecture/ADR/PRD context. Load only recent-decisions.md. Missing is fine; the skill creates it on first use.",
+        "command": "load",
+        "only_skills": ["memo"],
+        "paths": ["dev-team-state/global/strategist/recent-decisions.md"],
+        "missing": "ignore"
+      },
+      {
+        "_comment": "Founding is multi-turn: founding-discussion.md is the running scratch doc it appends to across sessions. It was NOT loaded, so a resuming founding session couldn't see its own prior notes and hunted for the file (which then missed on a cwd-relative path). Load it so the agent picks up where it left off. Missing is fine on the first founding session.",
+        "command": "load",
+        "only_skills": ["founding"],
+        "paths": ["dev-team-state/projects/${PROJECT}/strategist/founding-discussion.md"],
+        "missing": "ignore"
+      },
+      {
+        "_comment": "If founding docs are missing, the agent should refuse to do PRD/BA/Research/etc. work and instead suggest running Phase 0.",
+        "command": "check",
+        "if_missing": [
+          "<target-project>/founding/PRODUCT.md",
+          "<target-project>/founding/BRAND.md",
+          "<target-project>/founding/STACK.md"
+        ],
+        "then": "set_context",
+        "context": "founding_incomplete=true",
+        "message": "Phase 0 founding docs are not yet in the target project. Only the `founding` skill can run productively. Other skills should refuse and recommend `@strategist-agent kick off Phase 0`."
+      }
+    ],
+    "SessionEnd": [
+      {
+        "_comment": "Commit state changes to dev-team-state (own memory + shared surface).",
+        "command": "git_commit",
+        "repo": "dev-team-state",
+        "paths": [
+          "shared/**",
+        "global/strategist/**",
+          "projects/${PROJECT}/strategist/**",
+          "projects/${PROJECT}/_shared/strategist-marketer/**"
+        ],
+        "message_template": "[strategist] session ${SESSION_ID} — ${SKILL} on ${PROJECT}",
+        "push": true
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "Block any attempt to write to application code or infra paths.",
+        "tool": "Write",
+        "block_if_path_matches": [
+          "<target-project>/server/**",
+          "<target-project>/client/**",
+          "<target-project>/app/**",
+          "<target-project>/api/**",
+          "<target-project>/.github/**",
+          "dev-team/agents/**"
+        ],
+        "message": "Strategist cannot modify application code, infra files, or other agents' configs. Bounce this to the appropriate Builder or Platform agent."
+      }
+    ]
+  },
+
+  "_implementationNotes": {
+    "model": "Sonnet with extended thinking — strong reasoning without Opus cost. Synthesis and structuring is the agent's primary value; extended thinking pays for itself.",
+    "max_turns": "40 covers most multi-turn discussions (founding sessions, complex PRDs); cap protects against runaway loops.",
+    "hooks": "SessionStart loads house style from target project; SessionEnd commits state. PreToolUse hooks enforce blast radius technically, not just by prompt.",
+    "writeScope_notation": "<target-project> and ${PROJECT} are resolved by Cyrus from the webhook context. The .dev-team.yml in the target project specifies the exact paths.",
+    "mcp_servers_required": ["linear", "github", "slack", "analytics (read-only)"],
+    "future_additions": [
+      "An mcp__claude_design connector if Anthropic ships one — currently Claude Design is human-driven, so design-prefill skill outputs paste-ready prompts",
+      "A spend-tracking hook (FinOps cap enforcement) once Platform's FinOps skill is online"
+    ]
+  }
+}

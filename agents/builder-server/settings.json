@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Builder-Server agent — backend dev cycle owner. Writes backend code + migrations + tests; opens PRs; never merges. See agents/builder-server/SPEC.md and CLAUDE.md.",
+  "model": "claude-sonnet-5",
+  "modelOverrides": {
+    "_comment": "Per-skill model routing. `conversational` is the lightweight default (backend Q&A / code lookups / routing) — it produces no artifacts and doesn't load SYSTEM.md/ADR-index/coding-practices/active-prs, so it runs on Haiku at ~1/3 the token rates; a bare question stays cheap instead of loading heavy context + running the full implementation procedure on Sonnet. Every work skill (backend/ai-specialist/data-engineer/contract-design/pr-feedback) stays on the default Sonnet-5 — code work needs the reasoning depth.",
+    "conversational": "claude-haiku-4-5-20251001"
+  },
+  "thinking": {
+    "type": "enabled",
+    "budget_tokens": 8000
+  },
+  "max_turns": 150,
+  "costCap": {
+    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Builder-Server does heavy code work — extended thinking adds ~50% to typical session cost; PR-feedback iterations stack up over a single PR. Per-job ceiling is set high to accommodate complex implementation sessions. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
+    "perJobCostUsd": 8.0,
+    "perJobTokens": 800000,
+    "monthlyCostUsd": 150.0,
+    "monthlyTokensApprox": 12000000,
+    "warnAtPercent": 80,
+    "alertChannel": "#agents-alerts",
+    "onCapReached": "refuse_session",
+    "offHoursThrottling": null
+  },
+  "permissions": {
+    "allow": [
+      "_note: allow is not a restriction today. The SDK treats allowedTools as auto-allowed without prompting and says to use the tools option to restrict, which the router does not set yet. So this list documents what the agent actually uses, and it becomes the real boundary the moment tools is wired from it. Write/Edit/TodoWrite are declared here because they were relied on but undeclared, or parked in ask, a tier nothing reads.",
+      "TodoWrite",
+      "WebSearch",
+      "WebFetch",
+      "Read",
+      "Grep",
+      "Glob",
+      "Write",
+      "Edit",
+      "mcp__linear__create_issue",
+      "mcp__linear__create_comment",
+      "mcp__linear__update_issue_labels",
+      "mcp__linear__get_issue",
+      "mcp__linear__list_issues",
+      "mcp__github__get_*",
+      "mcp__github__list_*",
+      "mcp__github__search_*",
+      "mcp__github__create_issue",
+      "mcp__github__create_issue_comment",
+      "mcp__github__create_pull_request_review_comment",
+      "mcp__github_gitdata__reply_to_review_comment",
+      "mcp__github_gitdata__get_check_runs",
+      "mcp__github__create_pull_request",
+      "mcp__github__update_pull_request",
+      "mcp__slack__post_to_channel",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(git status)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rebase --onto:*)",
+      "Bash(pnpm:*)",
+      "Bash(npm:*)",
+      "Bash(yarn:*)",
+      "Bash(jest:*)",
+      "Bash(pytest:*)",
+      "Bash(tsc:*)",
+      "Bash(eslint:*)",
+      "Bash(prettier:*)",
+      "Bash(ruff:*)",
+      "Bash(black:*)",
+      "Bash(mypy:*)",
+      "Bash(npx mikro-orm:*)",
+      "Bash(npx prisma:*)",
+      "Bash(alembic:*)",
+      "Bash(dbmate:*)",
+      "Bash(git push -u origin agent/:*)",
+      "Bash(git push origin agent/:*)"
+    ],
+    "ask": [
+      "mcp__linear__update_issue_status",
+      "mcp__linear__assign_issue",
+      "mcp__linear__close_issue"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push --no-verify:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(git commit --amend:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git rebase -i:*)",
+      "Bash(git checkout main:*)",
+      "Bash(git checkout staging:*)",
+      "Bash(rm -rf:*)",
+      "Bash(docker:*)",
+      "Bash(kubectl:*)",
+      "Bash(terraform:*)",
+      "Bash(pulumi:*)",
+      "Bash(helm:*)",
+      "Bash(aws:*)",
+      "Bash(gcloud:*)",
+      "Bash(fly deploy:*)",
+      "Bash(vercel:*)",
+      "Bash(railway:*)",
+      "mcp__linear__delete_*",
+      "mcp__linear__archive_*",
+      "mcp__github__merge_pull_request",
+      "mcp__github__delete_*",
+      "mcp__email__send",
+      "mcp__deploy__*",
+      "mcp__secrets__*"
+    ],
+    "defaultMode": "default"
+  },
+  "writeScope": {
+    "_comment": "Builder-Server writes: backend code + backend tests + migrations + own state. NEVER frontend, NEVER infra, NEVER founding/SYSTEM.md/ADRs, NEVER other agents' configs or docs domains.",
+    "allowedPaths": [
+      "<target-project>/server/**",
+      "<target-project>/api/**",
+      "<target-project>/services/**",
+      "<target-project>/src/**",
+      "<target-project>/backend/**",
+      "<target-project>/tests/api/**",
+      "<target-project>/tests/integration/**",
+      "<target-project>/tests/unit/**",
+      "<target-project>/migrations/**",
+      "<target-project>/contracts/**",
+      "dev-team-state/global/builder-server/**",
+      "dev-team-state/projects/*/builder-server/**"
+    ],
+    "deniedPaths": [
+      "<target-project>/client/**",
+      "<target-project>/web/**",
+      "<target-project>/app/**",
+      "<target-project>/mobile/**",
+      "<target-project>/.github/**",
+      "<target-project>/Dockerfile*",
+      "<target-project>/docker-compose*.yml",
+      "<target-project>/docker-compose*.yaml",
+      "<target-project>/terraform/**",
+      "<target-project>/pulumi/**",
+      "<target-project>/infra/**",
+      "<target-project>/founding/**",
+      "<target-project>/docs/architecture/**",
+      "<target-project>/docs/adrs/**",
+      "<target-project>/docs/runbooks/**",
+      "<target-project>/docs/incidents/**",
+      "<target-project>/docs/security/**",
+      "<target-project>/docs/compliance/**",
+      "<target-project>/docs/perf/**",
+      "<target-project>/docs/brand/**",
+      "<target-project>/docs/marketing/**",
+      "<target-project>/docs/design-system/**",
+      "<target-project>/docs/prds/**",
+      "<target-project>/docs/analysis/**",
+      "<target-project>/docs/research/**",
+      "dev-team/agents/**",
+      "dev-team-state/projects/*/strategist/**",
+      "dev-team-state/projects/*/builder-client/**",
+      "dev-team-state/projects/*/platform/**",
+      "dev-team-state/projects/*/guardian/**",
+      "dev-team-state/projects/*/marketer/**",
+      "dev-team-state/projects/*/_shared/**"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "Always load: founding docs (the house-style preamble). Small + needed by every skill for project context, so it loads for all sessions incl. the lightweight conversational Q&A default.",
+        "command": "load",
+        "paths": [
+          "<target-project>/founding/PRODUCT.md",
+          "<target-project>/founding/BRAND.md",
+          "<target-project>/founding/STACK.md",
+          "<target-project>/founding/COMPLIANCE.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/founding/COMPLIANCE.md": "ignore"
+        }
+      },
+      {
+        "_comment": "Heavy context — SYSTEM.md + ADR index + project CLAUDE.md + coding-practices (living tactical-patterns doc maintained by pr-feedback) + active-prs — loaded ONLY for the work skills that use it. The lightweight `conversational` default (backend Q&A / lookups) skips this so a one-line answer doesn't cache-write tens-of-K tokens every session; it reads a specific file on demand instead. ADR index is small (one line per ADR); individual ADR bodies are fetched on demand via Read. See load-hook `only_skills`.",
+        "command": "load",
+        "only_skills": [
+          "backend",
+          "ai-specialist",
+          "data-engineer",
+          "contract-design",
+          "pr-feedback"
+        ],
+        "paths": [
+          "<target-project>/docs/architecture/SYSTEM.md",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md",
+          "<target-project>/CLAUDE.md",
+          "dev-team-state/projects/${PROJECT}/builder-server/coding-practices.md",
+          "dev-team-state/projects/${PROJECT}/builder-server/active-prs.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/docs/architecture/SYSTEM.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md": "ignore_pre_phase_3",
+          "<target-project>/CLAUDE.md": "ignore_if_absent",
+          "dev-team-state/projects/${PROJECT}/builder-server/coding-practices.md": "ignore_first_session",
+          "dev-team-state/projects/${PROJECT}/builder-server/active-prs.md": "ignore_first_session"
+        }
+      },
+      {
+        "_comment": "If founding STACK.md or SYSTEM.md is missing, refuse substantive code work. Recommend Phase 0 / Phase 3.",
+        "command": "check",
+        "if_missing": [
+          "<target-project>/founding/STACK.md",
+          "<target-project>/docs/architecture/SYSTEM.md"
+        ],
+        "then": "set_context",
+        "context": "stack_or_system_missing=true",
+        "message": "Cannot do substantive code work without STACK.md and SYSTEM.md. Refuse implementation tasks; recommend running Phase 0 (`@strategist-agent kick off Phase 0`) and Phase 3 (`@platform-agent design the system architecture`) first."
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "Block writes to forbidden paths.",
+        "tool": "Write",
+        "block_if_path_matches": [
+          "<target-project>/client/**",
+          "<target-project>/web/**",
+          "<target-project>/app/**",
+          "<target-project>/mobile/**",
+          "<target-project>/.github/**",
+          "<target-project>/Dockerfile*",
+          "<target-project>/founding/**",
+          "<target-project>/docs/architecture/**",
+          "<target-project>/docs/adrs/**",
+          "dev-team/agents/**"
+        ],
+        "message": "Builder-Server cannot modify this path. Bounce to the appropriate agent: frontend → Builder-Client; infra → Platform; founding/architecture/ADRs → Strategist/Platform."
+      },
+      {
+        "_comment": "Block git push to default branches.",
+        "tool": "Bash",
+        "pattern": "git push.*(main|staging|production|prod|master)",
+        "deny_always": true,
+        "message": "🛑 Cannot push to default/protected branches. Open a PR from your agent-owned branch instead."
+      },
+      {
+        "_comment": "Block bypass attempts.",
+        "tool": "Bash",
+        "patterns": [
+          "--no-verify",
+          "--force(-with-lease)?\\s+origin/(main|staging)"
+        ],
+        "deny_always": true,
+        "message": "🛑 Bypass attempts are forbidden. No --no-verify, no force-push to shared branches."
+      },
+      {
+        "_comment": "Block merge.",
+        "tool": "mcp__github__merge_pull_request",
+        "deny_always": true,
+        "message": "Builder-Server does not merge PRs — including its own. Humans merge."
+      }
+    ],
+    "PostToolUse": [
+      {
+        "_comment": "After Edit/Write to a code file, run lint + format on changed files.",
+        "tool": [
+          "Edit",
+          "Write"
+        ],
+        "if_path_matches": [
+          "**/*.ts",
+          "**/*.tsx",
+          "**/*.js",
+          "**/*.jsx",
+          "**/*.py"
+        ],
+        "command": "lint_and_format",
+        "fix": true
+      }
+    ],
+    "SessionEnd": [
+      {
+        "_comment": "Durability for a session that gets cut off. Work lives in the leased worktree, which outlives the session — but only on disk: invisible in git, and gone with the volume. A truncated session used to leave nothing a human could see. This commits whatever is still uncommitted and pushes it to the agent branch, so a cut-off session leaves a real WIP commit on the PR branch instead of a dirty directory. Skips cleanly when the session leased no worktree.",
+        "command": "git_commit_if_changed",
+        "repo": "<workspace>",
+        "message_template": "[WIP] session ${SESSION_ID} — ${SKILL} (session ended before this was committed)",
+        "push": true
+      },
+      {
+        "_comment": "Commit state changes to dev-team-state (active-prs index, known-gotchas, etc.).",
+        "command": "git_commit",
+        "repo": "dev-team-state",
+        "paths": [
+          "shared/**",
+        "global/builder-server/**",
+          "projects/${PROJECT}/builder-server/**"
+        ],
+        "message_template": "[builder-server] session ${SESSION_ID} — ${SKILL} on ${PROJECT}",
+        "push": true
+      }
+    ]
+  },
+  "_implementationNotes": {
+    "model": "Sonnet with extended thinking (8000 tokens). Strong reasoning is non-negotiable for code work; extended thinking gets Opus-grade planning at Sonnet cost.",
+    "max_turns": "50 — code work needs more turns than analytical work (Strategist/Platform). Cap protects against runaway loops on stuck implementations.",
+    "writeScope_strict_denies": "Denied paths intentionally enumerate every other agent's docs domain even though allowedPaths is narrow. Belt + suspenders.",
+    "mcp_servers_required": [
+      "linear",
+      "github",
+      "slack"
+    ],
+    "future_additions": [
+      "Per-project test runner detection — currently allowing pnpm/npm/yarn/jest/pytest broadly; could narrow per .dev-team.yml stack hint",
+      "Auto-detect contract path from .dev-team.yml api_contract.path",
+      "DB connection MCP for staging-snapshot test data (currently only local test DB)"
+    ]
+  }
+}

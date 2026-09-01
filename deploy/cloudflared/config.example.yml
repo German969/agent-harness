@@ -1,0 +1,25 @@
+# Cloudflare Tunnel config template.
+#
+# Provision the tunnel in the Cloudflare Zero Trust dashboard, download the
+# credentials JSON, drop it at ./credentials.json (next to this file), copy
+# this to ./config.yml, and replace the placeholders.
+#
+# Docs: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+
+tunnel: CHANGE_ME_TUNNEL_UUID
+credentials-file: /etc/cloudflared/credentials.json
+
+# One hostname per webhook route we accept — see the six identities' webhook URLs.
+# The router uses a single Fastify server; cloudflared routes any hostname to it.
+ingress:
+  - hostname: router.dev-team.example.com
+    service: http://router:8080
+
+  # Catch-all — anything else returns 404.
+  - service: http_status:404
+
+# --- Notes ------------------------------------------------------------------
+# - Cloudflare's Zero-Trust "Service Auth" can gate paths (e.g. /metrics) to
+#   specific service tokens. Add access rules in the dashboard.
+# - Log settings + metrics are configured via `cloudflared` flags in
+#   docker-compose.yml if needed.

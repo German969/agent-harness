@@ -1,0 +1,41 @@
+{
+  "_comment": "Strategist MCP set — Linear (issues/comments), GitHub (read + create issues), Slack (post messages). Web research uses WebSearch + WebFetch tools (not MCP). Verify each package name + command before Phase 1 deploy (the MCP ecosystem moves fast; canonical packages change names).",
+
+  "_note_mcp_baked": "RESOLVED (was _followup_npx_mcp_hardening): the github/slack/filesystem stdio MCP servers are now baked into the router image (deploy/Dockerfile: `npm install -g`, exact-pinned) and invoked by absolute path (/usr/local/bin/mcp-server-*) instead of `npx -y`, so spawning is deterministic + offline — no more per-session install and no npx-cache SIGKILL under disk pressure. Exceptions that intentionally stay on npx: the `_linear` placeholders (inactive, `_`-prefixed) and builder-client's `@anthropic-ai/mcp-claude-preview` (an evolving preview package a version pin would freeze).",
+
+  "mcpServers": {
+    "linear": {
+      "type": "sdk",
+      "gated_mutations": true,
+      "_comment": "In-process Linear MCP (mcp__linear__list_teams / list_labels / search_issues / create_issue / create_comment / create_label / create_project / create_project_milestone). Router-hosted wrapper over Linear's GraphQL API, authed with the session's ${LINEAR_TOKEN} (from Infisical LINEAR_TOKEN_strategist). Strategist's ALWAYS-ALLOWED tier is exposed every session; the GATED tier (move_issue / set_milestone / assign_issue / set_due_date / close_issue) is exposed ONLY in a human-command session (explicit @-mention) because of gated_mutations:true — the runtime withholds those tools from autonomous/work sessions (AGENTS.md tiered Linear scope). Delete / archive remain forbidden (no tool). Replaces the deprecated @modelcontextprotocol/server-linear stdio package. See router/src/linear/linearMcp.ts."
+    },
+
+    "github": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-github",
+      "args": [],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_APP_INSTALLATION_TOKEN}"
+      },
+      "only_skills": ["pm", "founding", "ba", "researcher", "curator", "triage"],
+      "_comment": "GitHub MCP (official) — read repos, create issues, comment on PRs. Strategist is read-only on code; never opens code-changing PRs. only_skills: skipped for the lightweight `conversational` default + `pjm` (Linear-based) so a bare lookup doesn't cache-write this whole tool surface; deep code questions route to Builders. The token is a short-lived App installation token, exchanged per-session by the router from the agent's App private key."
+    },
+
+    "github_gitdata": {
+      "type": "sdk",
+      "only_skills": ["founding", "curator", "pm"],
+      "_comment": "In-process Git Data tools (mcp__github_gitdata__move_file / delete_file / apply_file_ops) — content-free rename/delete via blob SHA, for files past the ~40KB Contents-API wall. only_skills: only the skills that restructure files (founding docs, curator drift sweeps, PM doc moves) load it. Instantiated by the router adapter with the session's GitHub App installation token; refuses protected branches (main/staging/…). See router/src/github/gitDataMcp.ts."
+    },
+
+    "slack": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-slack",
+      "args": [],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
+      },
+      "_comment": "Slack MCP (official) — post messages, read channel context where bot is invited. Strategist posts to #engineering, #planning, and (Triage) wherever support feedback lands."
+    }
+  }
+}

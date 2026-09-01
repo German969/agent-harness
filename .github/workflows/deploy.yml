@@ -1,0 +1,68 @@
+name: deploy
+
+# Deploys router source + compose changes to the VPS on every push to main —
+# but only after ci.yml's verify job passes. `git reset --hard origin/main` on
+# the VPS is unforgiving, so nothing ships without lint/typecheck/test/build green.
+# Note: agent config (CLAUDE.md, settings, skills, mcp.json) is re-read per session,
+# so those changes do land via the git-pull sidecar alone. `identities/*.yml` does NOT
+# — the routing registry is built once at boot and has no reload path, so an identity
+# edit needs a router recreate. The paths filter below does not match identities/, so
+# run this workflow via workflow_dispatch after an identity-only change.
+#
+# Requires these repo secrets (Settings -> Secrets and variables -> Actions):
+#   VPS_HOST        public host/IP of the VPS
+#   VPS_USER        ssh user (recommend `agents` — in the docker group, owns /opt/dev-team)
+#   VPS_SSH_KEY     PRIVATE key of a DEDICATED deploy keypair (its .pub is in the
+#                   user's ~/.ssh/authorized_keys on the VPS). Never a personal key.
+#   VPS_KNOWN_HOSTS output of `ssh-keyscan <VPS_HOST>` — pins the host key.
+
+on:
+  push:
+    branches: [main]
+    # Only rebuild the router when code, its deps, or the deploy setup change.
+    # Per-session config (agents/*, scheduler/*) is re-read per session and needs no
+    # recreate. identities/*.yml DOES need one — the routing registry is boot-time
+    # only — but is deliberately left out of this filter to keep deploys tied to code
+    # changes; use workflow_dispatch after an identity edit.
+    paths:
+      - 'router/**'
+      - 'deploy/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  # Gate: reuses ci.yml so the checks live in exactly one place.
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        # Pull first, then run the (now up-to-date) script. This bootstraps the
+        # script itself on the very first run and self-updates it thereafter, so
+        # /opt/dev-team only ever needs to be a valid clone of the repo.
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${VPS_USER}@${VPS_HOST}" \
+            'cd /opt/dev-team && git fetch --quiet origin main && git reset --hard origin/main && sh deploy/scripts/remote-deploy.sh'

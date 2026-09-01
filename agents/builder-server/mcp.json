@@ -1,0 +1,43 @@
+{
+  "_comment": "Builder-Server MCP set — Linear + GitHub + Slack. Most backend work happens via file tools (Read/Edit/Write) + Bash (project's package manager + test runner + migration tool). MCPs are for cross-system interaction. Verify package names before Phase 1 deploy.",
+
+  "mcpServers": {
+    "linear": {
+      "type": "sdk",
+      "_comment": "In-process Linear MCP, same router-hosted wrapper Strategist uses (router/src/linear/linearMcp.ts), authed with the session's ${LINEAR_TOKEN} from Infisical LINEAR_TOKEN_builder_server. Replaces the deprecated @modelcontextprotocol/server-linear stdio package, which was left disabled behind an `_` prefix when Strategist migrated \u2014 `_`-prefixed servers are skipped by BOTH activeServers() and collectInProcessMcp(), so this agent had no Linear tools at all while its permissions.allow listed five of them, and the decomposition rule in CLAUDE.md told it to call create_issue. No gated_mutations: the ALWAYS-ALLOWED tier (create_issue / create_comment / get_issue / list_issues / search_issues / list_teams / list_labels) is what this agent's allow-list declares; move/assign/close stay out of reach entirely."
+    },
+
+    "github": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-github",
+      "args": [],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_APP_INSTALLATION_TOKEN}"
+      },
+      "_comment": "GitHub MCP — push branches, open PRs, respond to PR review comments (pr-feedback skill), update PR descriptions, request reviewers, manage PR labels. Builder-Server is the heaviest GitHub user in the fleet."
+    },
+
+    "github_gitdata": {
+      "type": "sdk",
+      "_comment": "In-process Git Data tools (mcp__github_gitdata__move_file / delete_file / apply_file_ops) — content-free rename/delete via blob SHA, for files past the ~40KB Contents-API wall. Lets Builder-Server refactor code that moves/removes files. Instantiated by the router adapter with the session's GitHub App installation token; refuses protected branches (main/staging/…). See router/src/github/gitDataMcp.ts."
+    },
+
+    "slack": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-slack",
+      "args": [],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
+      },
+      "_comment": "Slack MCP — post status updates to #engineering when a ticket transitions states; respond to direct mentions about backend work."
+    }
+  },
+
+  "_future_mcp_candidates": {
+    "_comment": "Possible additions during Phase 4+ if the project benefits. NOT enabled at v1.",
+    "postgres": "@modelcontextprotocol/server-postgres for read-only schema introspection. Useful when Builder-Server is writing migrations and needs the current schema state. Read-only credentials only.",
+    "sentry": "If the project's backend uses Sentry, an MCP for reading recent errors would help with bug-fix tickets. Read-only.",
+    "openapi": "If the project has a published OpenAPI spec, a contract-design MCP could help with contract-first work. Project-specific."
+  }
+}

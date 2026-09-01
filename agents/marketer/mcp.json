@@ -1,0 +1,88 @@
+{
+  "_comment": "Marketer MCP set — the heaviest in the fleet. Baseline Linear+GitHub+Slack PLUS platform-specific MCPs (CMS, email, social scheduler, analytics). The platform-specific entries are TEMPLATES — the actual toolbelt is decided in Phase 6 (per PLAN.md): which CMS, which email platform, which social scheduler, which analytics. Each platform's MCP must be AUDITED before connecting — verify the MCP exposes draft-only actions and does NOT expose publish/send/post_now/schedule_send/schedule_post verbs that would bypass Marketer's publish-gate (per settings.json PreToolUse action-verb hook). Update this file as toolbelt decisions land.",
+
+  "mcpServers": {
+    "_linear": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-linear"],
+      "env": {
+        "LINEAR_API_KEY": "${LINEAR_TOKEN}"
+      },
+      "_comment": "Linear MCP — Marketer creates campaign epics + child tickets per content asset; routes screenshot requests to @client-agent via Linear tickets per Protocol #4; cross-references testimonial-permission state."
+    },
+
+    "github": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-github",
+      "args": [],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_APP_INSTALLATION_TOKEN}"
+      },
+      "_comment": "GitHub MCP — open PRs against the <target-project>-marketing content repo (blog posts, case studies, campaign plans, retrospectives). Marketer NEVER opens PRs against the main target project (denied by writeScope)."
+    },
+
+    "slack": {
+      "type": "stdio",
+      "command": "/usr/local/bin/mcp-server-slack",
+      "args": [],
+      "env": {
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
+      },
+      "_comment": "Slack MCP — post draft notifications + weekly summaries to #marketing, #growth, #leadership (per agent's channel allow-list)."
+    },
+
+    "_cms_template": {
+      "_TBD_in_phase_6": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "<the-cms-mcp-package-once-chosen>"],
+      "env": {
+        "CMS_API_KEY": "${CMS_API_KEY}"
+      },
+      "_comment": "CMS MCP — once the toolbelt decision is made in Phase 6 (Webflow / Ghost / WordPress / Contentful / Sanity / MDX-in-git / etc.), populate this entry. CRITICAL: the MCP must expose ONLY draft-class actions (create_draft, update_draft, list_drafts, get_draft). Verbs like publish / schedule_publish / set_status_published are denied by Marketer's PreToolUse action-verb hook AND should be denied in settings.json's deny list. Rename this key from `_cms_template` to `cms` once the actual MCP is wired."
+    },
+
+    "_email_template": {
+      "_TBD_in_phase_6": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "<the-email-mcp-package-once-chosen>"],
+      "env": {
+        "EMAIL_PLATFORM_API_KEY": "${EMAIL_PLATFORM_API_KEY}"
+      },
+      "_comment": "Email platform MCP — Customer.io / Mailchimp / Brevo / Resend / Loops / etc. (chosen in Phase 6). CRITICAL: must expose ONLY draft-class actions (create_draft, update_draft, list_drafts, get_segment_size). NEVER send, schedule_send, or set_status_active. Rename `_email_template` to `email` once wired."
+    },
+
+    "_social_template": {
+      "_TBD_in_phase_6": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "<the-social-scheduler-mcp-package-once-chosen>"],
+      "env": {
+        "SOCIAL_SCHEDULER_API_KEY": "${SOCIAL_SCHEDULER_API_KEY}"
+      },
+      "_comment": "Social scheduler MCP — Buffer / Hootsuite / Typefully / etc. CRITICAL: must expose ONLY draft-class actions in unscheduled state (create_draft, update_draft, list_drafts). NEVER post, post_now, schedule_post. Rename to `social` once wired."
+    },
+
+    "_analytics_template": {
+      "_TBD_in_phase_6": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "<the-analytics-mcp-package-once-chosen>"],
+      "env": {
+        "ANALYTICS_API_KEY": "${ANALYTICS_API_KEY}"
+      },
+      "_comment": "Analytics MCP — PostHog / GA4 / Mixpanel / Amplitude / Plausible. READ-ONLY by design — the growth-analyst skill needs query access, never write access. Multiple analytics MCPs can coexist (e.g. PostHog for product, GA4 for web). Rename to `analytics-<provider>` per provider when wired."
+    }
+  },
+
+  "_toolbelt_audit_checklist": {
+    "_comment": "Before connecting any platform-specific MCP in Phase 6, run this audit:",
+    "1_action_verb_audit": "Read the MCP's tool list. Confirm NO tool exposes a publish-class verb (publish / publish_now / schedule_publish / send / send_now / schedule_send / post / post_now / schedule_post / launch / spend / go_live / set_status_active / set_status_published).",
+    "2_deny_list_update": "If the MCP DOES expose publish-class verbs, add them to settings.json deny list BEFORE connecting (so the deny list catches them as defense in depth alongside the PreToolUse action-verb hook).",
+    "3_credential_scoping": "The MCP credential should be limited to draft scope where possible (e.g. Customer.io has a separate API key for drafts vs sends — use the draft-only one).",
+    "4_test_session": "Run a sandbox session that intentionally tries to publish. Confirm the publish-gate blocks it (Phase 7 verification 9 + 11 in PLAN.md)."
+  }
+}

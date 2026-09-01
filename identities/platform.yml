@@ -1,0 +1,78 @@
+# identities/platform.yml
+#
+# Platform's bot identity + routing rules. See identities/README.md for the contract.
+# Placeholder values are `~`; real values fill in during Phase 3 (Platform deploy wave).
+
+agent: platform
+
+# ============================================================================
+# GitHub App identity
+# ============================================================================
+github:
+  app_slug: dev-team-platform                     # https://github.com/apps/dev-team-platform (confirm exact slug)
+  app_id: 123456                                 # numeric App ID
+  bot_username: platform-agent                    # display name in reply footers
+  installation_url: https://github.com/apps/dev-team-platform/installations/7654321
+  installations:
+    target_project: 7654321                      # installation_id on German969/chatbots
+  # Target repo — Platform's IaC / CI / scaffold PRs land here.
+  target_repo:
+    owner: German969
+    name: chatbots
+    default_branch: main
+
+# ============================================================================
+# Linear agent identity
+# ============================================================================
+linear:
+  agent_handle: platform-bot
+  agent_id: ~
+  user_id: ~
+
+# ============================================================================
+# Slack app identity
+# ============================================================================
+slack:
+  app_id: A0123ABCDEF
+  bot_user_id: U0123ABCDEF
+  team_id: T0123ABCDEF                                      # 'T...' workspace id - required by the slack MCP (${SLACK_TEAM_ID})
+  channels:
+    primary:
+      - "#engineering"                            # release-manager + architect post here
+      - "#incidents"                              # incident-response posts here
+      - "#agents-alerts"                          # finops alerts post here
+    alerts: "#agents-alerts"
+
+# ============================================================================
+# Routing rules
+# ============================================================================
+routing:
+  linear_labels:
+    - arch                                        # architect skill
+    - adr                                         # architect skill (ADR-specific)
+    - system-design                               # system-design skill (rare; Phase 3 mostly)
+    - release                                     # release-manager skill
+    - finops                                      # finops skill
+    - incident                                    # incident-response skill
+    - devops                                      # devops skill (CI/CD, deploy infra)
+    - cost-signoff                                # finops skill (pre-spend approvals)
+  slack_default_channels:
+    - "#incidents"                                # Platform is the natural incident owner
+  github_auto_triggers: []                        # Platform doesn't auto-fire on PR events
+
+# ============================================================================
+# Conversation continuity
+# ============================================================================
+continuation_timeout_days: 30
+
+# ============================================================================
+# Secret references
+# ============================================================================
+secrets:
+  github_app_private_key: GITHUB_APP_PRIVATE_KEY_platform
+  github_webhook_secret: GITHUB_APP_WEBHOOK_SECRET_platform
+  linear_token: LINEAR_TOKEN_platform
+  linear_webhook_secret: LINEAR_WEBHOOK_SECRET_platform
+  slack_bot_token: SLACK_BOT_TOKEN_platform
+  slack_signing_secret: SLACK_SIGNING_SECRET_platform
+  anthropic_api_key: ANTHROPIC_API_KEY

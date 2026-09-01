@@ -1,0 +1,370 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Builder-Client agent — frontend dev cycle owner + screenshot producer for Marketer. Writes frontend code + tests + design-system updates + screenshots to the marketing repo. Never merges PRs. Never builds iOS (Linux VM constraint). See agents/builder-client/SPEC.md and CLAUDE.md.",
+  "model": "claude-sonnet-5",
+  "modelOverrides": {
+    "_comment": "Per-skill model routing. `conversational` is the lightweight default (frontend Q&A / code lookups / routing) — it produces no artifacts and doesn't load SYSTEM.md/ADR-index/design-system/coding-practices/active-prs, so it runs on Haiku at ~1/3 the token rates; a bare question stays cheap instead of loading heavy context + running the full UI procedure on Sonnet. Every work skill (frontend/mobile/a11y/claude-design-prefill/claude-design-handoff/screenshots/pr-feedback) stays on the default Sonnet-5 — visual + layout reasoning needs the depth.",
+    "conversational": "claude-haiku-4-5-20251001"
+  },
+  "thinking": {
+    "type": "enabled",
+    "budget_tokens": 8000
+  },
+  "max_turns": 150,
+  "costCap": {
+    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Builder-Client does heavy code work + visual verification (Claude Preview MCP calls add some token cost). Comparable budget to Builder-Server. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
+    "perJobCostUsd": 8.0,
+    "perJobTokens": 800000,
+    "monthlyCostUsd": 150.0,
+    "monthlyTokensApprox": 12000000,
+    "warnAtPercent": 80,
+    "alertChannel": "#agents-alerts",
+    "onCapReached": "refuse_session",
+    "offHoursThrottling": null
+  },
+  "permissions": {
+    "allow": [
+      "_note: allow is not a restriction today. The SDK treats allowedTools as auto-allowed without prompting and says to use the tools option to restrict, which the router does not set yet. So this list documents what the agent actually uses, and it becomes the real boundary the moment tools is wired from it. Write/Edit/TodoWrite are declared here because they were relied on but undeclared, or parked in ask, a tier nothing reads.",
+      "TodoWrite",
+      "WebSearch",
+      "WebFetch",
+      "Read",
+      "Grep",
+      "Glob",
+      "Write",
+      "Edit",
+      "mcp__linear__create_issue",
+      "mcp__linear__create_comment",
+      "mcp__linear__update_issue_labels",
+      "mcp__linear__get_issue",
+      "mcp__linear__list_issues",
+      "mcp__github__get_*",
+      "mcp__github__list_*",
+      "mcp__github__search_*",
+      "mcp__github__create_issue",
+      "mcp__github__create_issue_comment",
+      "mcp__github__create_pull_request_review_comment",
+      "mcp__github__create_pull_request",
+      "mcp__github__update_pull_request",
+      "mcp__slack__post_to_channel",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_Preview__preview_stop",
+      "mcp__Claude_Preview__preview_navigate",
+      "mcp__Claude_Preview__preview_screenshot",
+      "mcp__Claude_Preview__preview_resize",
+      "mcp__Claude_Preview__preview_click",
+      "mcp__Claude_Preview__preview_fill",
+      "mcp__Claude_Preview__preview_eval",
+      "mcp__Claude_Preview__preview_console_logs",
+      "mcp__Claude_Preview__read_page",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(git status)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rebase --onto:*)",
+      "Bash(pnpm:*)",
+      "Bash(npm:*)",
+      "Bash(yarn:*)",
+      "Bash(jest:*)",
+      "Bash(vitest:*)",
+      "Bash(tsc:*)",
+      "Bash(eslint:*)",
+      "Bash(prettier:*)",
+      "Bash(playwright:*)",
+      "Bash(cypress:*)",
+      "Bash(expo:*)",
+      "Bash(eas:*)",
+      "Bash(git push -u origin agent/:*)",
+      "Bash(git push origin agent/:*)"
+    ],
+    "ask": [
+      "mcp__linear__update_issue_status",
+      "mcp__linear__assign_issue",
+      "mcp__linear__close_issue"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push --no-verify:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(git commit --amend:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git rebase -i:*)",
+      "Bash(git checkout main:*)",
+      "Bash(git checkout staging:*)",
+      "Bash(rm -rf:*)",
+      "Bash(docker:*)",
+      "Bash(kubectl:*)",
+      "Bash(terraform:*)",
+      "Bash(pulumi:*)",
+      "Bash(helm:*)",
+      "Bash(aws:*)",
+      "Bash(gcloud:*)",
+      "Bash(fly deploy:*)",
+      "Bash(vercel deploy:*)",
+      "Bash(vercel --prod:*)",
+      "Bash(netlify deploy:*)",
+      "Bash(eas submit:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(simctl:*)",
+      "mcp__linear__delete_*",
+      "mcp__linear__archive_*",
+      "mcp__github__merge_pull_request",
+      "mcp__github__delete_*",
+      "mcp__email__send",
+      "mcp__deploy__*",
+      "mcp__secrets__*"
+    ],
+    "defaultMode": "default"
+  },
+  "writeScope": {
+    "_comment": "Builder-Client writes: frontend code + frontend tests + design-system.md state + screenshot library in marketing repo + own state. NEVER backend, NEVER infra, NEVER founding/SYSTEM.md/ADRs, NEVER other agents' docs domains.",
+    "allowedPaths": [
+      "<target-project>/client/**",
+      "<target-project>/web/**",
+      "<target-project>/app/**",
+      "<target-project>/apps/web/**",
+      "<target-project>/apps/mobile/**",
+      "<target-project>/mobile/**",
+      "<target-project>/packages/ui/**",
+      "<target-project>/packages/components/**",
+      "<target-project>/packages/state/**",
+      "<target-project>/src/components/**",
+      "<target-project>/src/pages/**",
+      "<target-project>/src/styles/**",
+      "<target-project>/src/hooks/**",
+      "<target-project>/tests/components/**",
+      "<target-project>/tests/e2e/**",
+      "<target-project>/tests/visual/**",
+      "<target-project>-marketing/assets/screenshots/**",
+      "dev-team-state/global/builder-client/**",
+      "dev-team-state/projects/*/builder-client/**"
+    ],
+    "deniedPaths": [
+      "<target-project>/server/**",
+      "<target-project>/api/**",
+      "<target-project>/services/**",
+      "<target-project>/backend/**",
+      "<target-project>/migrations/**",
+      "<target-project>/contracts/**",
+      "<target-project>/.github/**",
+      "<target-project>/Dockerfile*",
+      "<target-project>/docker-compose*.yml",
+      "<target-project>/docker-compose*.yaml",
+      "<target-project>/terraform/**",
+      "<target-project>/pulumi/**",
+      "<target-project>/infra/**",
+      "<target-project>/founding/**",
+      "<target-project>/docs/architecture/**",
+      "<target-project>/docs/adrs/**",
+      "<target-project>/docs/runbooks/**",
+      "<target-project>/docs/incidents/**",
+      "<target-project>/docs/security/**",
+      "<target-project>/docs/compliance/**",
+      "<target-project>/docs/perf/**",
+      "<target-project>/docs/brand/**",
+      "<target-project>/docs/marketing/**",
+      "<target-project>/docs/prds/**",
+      "<target-project>/docs/analysis/**",
+      "<target-project>/docs/research/**",
+      "dev-team/agents/**",
+      "dev-team-state/projects/*/strategist/**",
+      "dev-team-state/projects/*/builder-server/**",
+      "dev-team-state/projects/*/platform/**",
+      "dev-team-state/projects/*/guardian/**",
+      "dev-team-state/projects/*/marketer/**",
+      "dev-team-state/projects/*/_shared/**"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "Always load: founding docs (the house-style preamble). Small + needed by every skill for project context, so it loads for all sessions incl. the lightweight conversational Q&A default.",
+        "command": "load",
+        "paths": [
+          "<target-project>/founding/PRODUCT.md",
+          "<target-project>/founding/BRAND.md",
+          "<target-project>/founding/STACK.md",
+          "<target-project>/founding/COMPLIANCE.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/founding/COMPLIANCE.md": "ignore"
+        }
+      },
+      {
+        "_comment": "Heavy context — SYSTEM.md + ADR index + design-system.md (critical for visual decisions) + coding-practices.md (state/structure/composition/anti-patterns from PR-feedback cycles) + project CLAUDE.md + active-prs — loaded ONLY for the work skills that use it. The lightweight `conversational` default (frontend Q&A / lookups) skips this so a one-line answer doesn't cache-write tens-of-K tokens every session; it reads a specific file on demand instead. See load-hook `only_skills`.",
+        "command": "load",
+        "only_skills": [
+          "frontend",
+          "mobile",
+          "a11y",
+          "claude-design-prefill",
+          "claude-design-handoff",
+          "screenshots",
+          "pr-feedback"
+        ],
+        "paths": [
+          "<target-project>/docs/architecture/SYSTEM.md",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md",
+          "dev-team-state/projects/${PROJECT}/builder-client/design-system.md",
+          "dev-team-state/projects/${PROJECT}/builder-client/coding-practices.md",
+          "<target-project>/CLAUDE.md",
+          "dev-team-state/projects/${PROJECT}/builder-client/active-prs.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/docs/architecture/SYSTEM.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/builder-client/design-system.md": "ignore_early_project",
+          "dev-team-state/projects/${PROJECT}/builder-client/coding-practices.md": "ignore_first_session",
+          "<target-project>/CLAUDE.md": "ignore_if_absent",
+          "dev-team-state/projects/${PROJECT}/builder-client/active-prs.md": "ignore_first_session"
+        }
+      },
+      {
+        "_comment": "If founding STACK.md or SYSTEM.md is missing, refuse substantive code work. Recommend Phase 0 / Phase 3.",
+        "command": "check",
+        "if_missing": [
+          "<target-project>/founding/STACK.md",
+          "<target-project>/docs/architecture/SYSTEM.md"
+        ],
+        "then": "set_context",
+        "context": "stack_or_system_missing=true",
+        "message": "Cannot do substantive UI work without STACK.md and SYSTEM.md. Refuse implementation tasks; recommend `@strategist-agent kick off Phase 0` and `@platform-agent design the system architecture` first."
+      },
+      {
+        "_comment": "If design-system.md is missing AND the task is non-trivial UI work, flag the gap. Use BRAND.md as a minimal fallback.",
+        "command": "check",
+        "if_missing": [
+          "dev-team-state/projects/${PROJECT}/builder-client/design-system.md"
+        ],
+        "then": "set_context",
+        "context": "design_system_missing=true",
+        "message": "design-system.md doesn't exist yet. Falling back to BRAND.md for visual direction; flag the gap in any UI plan and encourage humans to populate the design system."
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "Block writes to forbidden paths.",
+        "tool": "Write",
+        "block_if_path_matches": [
+          "<target-project>/server/**",
+          "<target-project>/api/**",
+          "<target-project>/services/**",
+          "<target-project>/.github/**",
+          "<target-project>/Dockerfile*",
+          "<target-project>/founding/**",
+          "<target-project>/docs/architecture/**",
+          "<target-project>/docs/adrs/**",
+          "<target-project>/contracts/**",
+          "<target-project>/migrations/**",
+          "dev-team/agents/**"
+        ],
+        "message": "Builder-Client cannot modify this path. Bounce to the appropriate agent: backend → Builder-Server; infra → Platform; founding/architecture/ADRs → Strategist/Platform; contracts → Builder-Server (via contract-design skill or CCP)."
+      },
+      {
+        "_comment": "Block git push to default branches.",
+        "tool": "Bash",
+        "pattern": "git push.*(main|staging|production|prod|master)",
+        "deny_always": true,
+        "message": "🛑 Cannot push to default/protected branches. Open a PR from your agent-owned branch instead."
+      },
+      {
+        "_comment": "Block bypass attempts.",
+        "tool": "Bash",
+        "patterns": [
+          "--no-verify",
+          "--force(-with-lease)?\\s+origin/(main|staging)"
+        ],
+        "deny_always": true,
+        "message": "🛑 Bypass attempts are forbidden. No --no-verify, no force-push to shared branches."
+      },
+      {
+        "_comment": "Block merge.",
+        "tool": "mcp__github__merge_pull_request",
+        "deny_always": true,
+        "message": "Builder-Client does not merge PRs — including its own. Humans merge."
+      }
+    ],
+    "PostToolUse": [
+      {
+        "_comment": "After Edit/Write to a code file, run lint + format on changed files.",
+        "tool": [
+          "Edit",
+          "Write"
+        ],
+        "if_path_matches": [
+          "**/*.ts",
+          "**/*.tsx",
+          "**/*.js",
+          "**/*.jsx",
+          "**/*.css",
+          "**/*.scss"
+        ],
+        "command": "lint_and_format",
+        "fix": true
+      }
+    ],
+    "SessionEnd": [
+      {
+        "_comment": "Durability for a session that gets cut off. Work lives in the leased worktree, which outlives the session — but only on disk: invisible in git, and gone with the volume. A truncated session used to leave nothing a human could see. This commits whatever is still uncommitted and pushes it to the agent branch, so a cut-off session leaves a real WIP commit on the PR branch instead of a dirty directory. Skips cleanly when the session leased no worktree.",
+        "command": "git_commit_if_changed",
+        "repo": "<workspace>",
+        "message_template": "[WIP] session ${SESSION_ID} — ${SKILL} (session ended before this was committed)",
+        "push": true
+      },
+      {
+        "_comment": "Commit state changes to dev-team-state.",
+        "command": "git_commit",
+        "repo": "dev-team-state",
+        "paths": [
+          "shared/**",
+        "global/builder-client/**",
+          "projects/${PROJECT}/builder-client/**"
+        ],
+        "message_template": "[builder-client] session ${SESSION_ID} — ${SKILL} on ${PROJECT}",
+        "push": true
+      },
+      {
+        "_comment": "If screenshots were committed to the marketing repo, push them.",
+        "command": "git_commit_if_changed",
+        "repo": "<target-project>-marketing",
+        "paths": [
+          "assets/screenshots/**"
+        ],
+        "message_template": "[client-bot] screenshots — ${SCREENSHOT_REASON}",
+        "create_pr": true,
+        "pr_label": "agent:client-bot"
+      }
+    ]
+  },
+  "_implementationNotes": {
+    "model": "Sonnet with extended thinking (8000 tokens). Visual reasoning + layout decisions benefit from explicit thinking.",
+    "max_turns": "50 — UI work + visual verification can take many turns. Cap protects against runaway loops.",
+    "claude_preview_mcp": "Critical for Phase 4 visual verification. Without this MCP, visual verification falls back to Playwright (slower, less flexible). Ensure the MCP is installed before Builder-Client goes live.",
+    "writeScope_marketing_repo": "Builder-Client writes screenshots to the marketing repo (sibling to target project). The exact path is configured per .dev-team.yml → marketing_assets.screenshots_path.",
+    "mcp_servers_required": [
+      "linear",
+      "github",
+      "slack",
+      "Claude_Preview"
+    ],
+    "future_additions": [
+      "Mobile native build verification via remote macOS runner (currently delegated to CI)",
+      "Auto-update design-system.md via a post-merge hook that detects new tokens or UI-kit additions",
+      "Visual regression baseline management (currently relies on the project's chosen tool — Percy / Chromatic / Playwright snapshots)"
+    ]
+  }
+}

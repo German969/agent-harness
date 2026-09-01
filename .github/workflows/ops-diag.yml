@@ -1,0 +1,86 @@
+name: ops-diag
+
+# Read-only VPS diagnostics (docker logs, health, session cost queries) without
+# giving anyone a shell. Manual trigger only — repo maintainers.
+#
+# Renamed from ops.yml (workflow name `ops`). That workflow's dispatch queue wedged
+# on 2026-08-26: `workflow_dispatch` returned 204 but created no run, while two runs
+# sat `queued` indefinitely and refused to cancel ("Cannot cancel a workflow run that
+# has not been queued yet"). Push-triggered workflows were unaffected throughout.
+# Editing the file did not clear it; a new path means a new workflow id, which
+# sidesteps the stuck one. The old run history stays under the retired `ops` entry. The remote side
+# (deploy/scripts/ops.sh) is an allowlist and the DB is opened read-only.
+#
+# That containment holds only for input that reaches ops.sh AS ARGUMENTS. `ssh host
+# CMD` concatenates its command arguments and the REMOTE shell parses the result, so
+# the operator's input is re-quoted first by .github/scripts/quote-op.py. Sending it
+# unquoted let `;` and `&&` run commands outside ops.sh entirely.
+#
+# Uses the same VPS_HOST / VPS_USER / VPS_SSH_KEY / VPS_KNOWN_HOSTS secrets as deploy.
+#
+# Examples for the `command` input:
+#   ps
+#   health
+#   logs chatbots-git-pull 20
+#   sessions 8
+#   turncost 135
+#   sql "SELECT id,skill,cost_usd FROM sessions ORDER BY id DESC LIMIT 5"
+#   statels projects/chatbots
+#   statels shared
+#   state shared/process/harness-behavior.md
+#   stategit
+#   workspace
+
+concurrency:
+  # Read-only diagnostics: a newer request supersedes an older one rather than
+  # queueing behind it, so stale runs cannot pile up in front of a live question.
+  group: ops
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'ops.sh args, e.g. `logs router 30` or `sql "SELECT ..."`'
+        required: true
+        type: string
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # This workflow historically checked nothing out — it only needed secrets + ssh.
+      # The command quoter lives in the repo, so the runner needs the tree now.
+      - name: Check out (for .github/scripts/quote-op.py)
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Run op
+        # Both hops are covered. OPS_CMD / OPS_ARGS travel via env and are never
+        # interpolated into the script body, so no `${{ }}` expansion can inject
+        # RUNNER-side shell. quote-op.py then re-quotes the input into an argv the
+        # REMOTE shell reconstructs verbatim instead of re-parsing, so `ps; id -un`
+        # reaches ops.sh as the single op name "ps;" (rejected by its allowlist)
+        # rather than as a second command that bypasses ops.sh completely.
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          OPS_CMD: ${{ inputs.command }}
+        run: |
+          OPS_ARGS="$(python3 .github/scripts/quote-op.py)"
+          # Echoed so a rejected op is diagnosable from the run log alone.
+          echo "remote argv: ${OPS_ARGS}"
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            "${VPS_USER}@${VPS_HOST}" \
+            "sh /opt/dev-team/deploy/scripts/ops.sh ${OPS_ARGS}"

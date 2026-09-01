@@ -1,0 +1,329 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Platform agent — cross-cutting concerns. The defining constraint: production-safety. Mutating infra commands are blocked at the tool layer, not just by prompt discipline. See agents/platform/SPEC.md and CLAUDE.md.",
+
+  "model": "claude-sonnet-5",
+  "modelOverrides": {
+    "_comment": "Per-skill model routing. `conversational` is the lightweight default (architecture/deploy/cost Q&A + lookups + routing) — it produces no artifacts and doesn't load SYSTEM.md/ADR-index/dependency-graph, so it runs on Haiku at ~1/3 the token rates. A bare cold question (e.g. a Slack 'hello') drops from ~$0.25 (full architect procedure on Sonnet) to a few cents. Every artifact/decision skill (system-design/architect/devops/release-manager/finops/incident-response) stays on the default Sonnet-5 — architecture is judgment under trade-offs and reasoning depth matters most here of any agent.",
+    "conversational": "claude-haiku-4-5-20251001"
+  },
+  "thinking": {
+    "type": "enabled",
+    "budget_tokens": 8000
+  },
+  "max_turns": 40,
+
+  "costCap": {
+    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Platform spans cheap work (cost reports, status) and expensive work (system-design — multi-session, big context). The per-job cap is set higher to accommodate system-design sessions. Incident-response is never throttled by off-hours. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
+    "perJobCostUsd": 6.00,
+    "perJobTokens": 600000,
+    "monthlyCostUsd": 80.00,
+    "monthlyTokensApprox": 6500000,
+    "warnAtPercent": 80,
+    "alertChannel": "#agents-alerts",
+    "onCapReached": "refuse_session",
+    "offHoursThrottling": null
+  },
+
+  "permissions": {
+    "allow": [
+      "_note: allow is not a restriction today. The SDK treats allowedTools as auto-allowed without prompting and says to use the tools option to restrict, which the router does not set yet. So this list documents what the agent actually uses, and it becomes the real boundary the moment tools is wired from it. Write/Edit/TodoWrite are declared here because they were relied on but undeclared, or parked in ask, a tier nothing reads.",
+      "Write",
+      "Edit",
+      "TodoWrite",
+      "Read",
+      "Grep",
+      "Glob",
+      "WebSearch",
+      "WebFetch",
+      "mcp__linear__create_issue",
+      "mcp__linear__create_comment",
+      "mcp__linear__update_issue_labels",
+      "mcp__linear__get_issue",
+      "mcp__linear__list_issues",
+      "mcp__github__get_*",
+      "mcp__github__list_*",
+      "mcp__github__search_*",
+      "mcp__github__create_issue",
+      "mcp__github__create_issue_comment",
+      "mcp__github__create_pull_request_review_comment",
+      "mcp__github__create_release_draft",
+      "mcp__slack__post_to_alerts_channel",
+      "mcp__billing__read_*",
+      "mcp__anthropic_usage__read_*",
+      "mcp__monitoring__read_*",
+      "mcp__observability__query_*",
+
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(git status)",
+      "Bash(git branch:*)",
+
+      "Bash(terraform plan:*)",
+      "Bash(terraform validate:*)",
+      "Bash(terraform fmt:*)",
+      "Bash(terraform graph:*)",
+
+      "Bash(pulumi preview:*)",
+      "Bash(pulumi config get:*)",
+      "Bash(pulumi stack output:*)",
+
+      "Bash(docker build:*)",
+      "Bash(docker compose config:*)",
+      "Bash(docker compose ps:*)",
+      "Bash(docker images:*)",
+      "Bash(docker inspect:*)",
+
+      "Bash(kubectl get:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(kubectl explain:*)",
+
+      "Bash(actionlint:*)",
+      "Bash(yamllint:*)",
+      "Bash(hadolint:*)",
+      "Bash(shellcheck:*)"
+    ],
+    "ask": [
+      "mcp__github__create_pull_request",
+      "mcp__github__create_release",
+      "mcp__linear__update_issue_status"
+    ],
+    "deny": [
+      "Bash(terraform apply:*)",
+      "Bash(terraform destroy:*)",
+      "Bash(terraform import:*)",
+      "Bash(terraform taint:*)",
+      "Bash(terraform state rm:*)",
+      "Bash(terraform state push:*)",
+      "Bash(terraform refresh:*)",
+
+      "Bash(pulumi up:*)",
+      "Bash(pulumi destroy:*)",
+      "Bash(pulumi refresh:*)",
+      "Bash(pulumi state delete:*)",
+
+      "Bash(docker push:*)",
+      "Bash(docker run:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker rmi:*)",
+      "Bash(docker volume rm:*)",
+      "Bash(docker network rm:*)",
+
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl patch:*)",
+      "Bash(kubectl replace:*)",
+      "Bash(kubectl rollout:*)",
+      "Bash(kubectl scale:*)",
+      "Bash(kubectl drain:*)",
+      "Bash(kubectl cordon:*)",
+      "Bash(kubectl uncordon:*)",
+      "Bash(kubectl create:*)",
+      "Bash(kubectl edit:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(kubectl port-forward:*)",
+
+      "Bash(helm install:*)",
+      "Bash(helm upgrade:*)",
+      "Bash(helm uninstall:*)",
+      "Bash(helm rollback:*)",
+
+      "Bash(aws ec2:*)",
+      "Bash(aws s3:* rm:*)",
+      "Bash(aws s3:* sync:*)",
+      "Bash(aws rds:*)",
+      "Bash(aws iam:*)",
+      "Bash(aws secretsmanager:*)",
+      "Bash(aws lambda update:*)",
+      "Bash(aws cloudformation:*)",
+
+      "Bash(gcloud compute:*)",
+      "Bash(gcloud sql:*)",
+      "Bash(gcloud iam:*)",
+      "Bash(gcloud secrets:*)",
+
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(git reset:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+
+      "Bash(fly deploy:*)",
+      "Bash(fly secrets:*)",
+      "Bash(railway up:*)",
+      "Bash(vercel:*)",
+      "Bash(netlify deploy:*)",
+
+      "Bash(curl -X POST:*)",
+      "Bash(curl -X PUT:*)",
+      "Bash(curl -X DELETE:*)",
+      "Bash(curl -X PATCH:*)",
+
+      "mcp__linear__delete_*",
+      "mcp__linear__archive_*",
+      "mcp__github__merge_pull_request",
+      "mcp__github__delete_*",
+      "mcp__github__publish_release",
+      "mcp__email__send",
+      "mcp__deploy__*",
+      "mcp__secrets__rotate*",
+      "mcp__secrets__delete*"
+    ],
+    "defaultMode": "default"
+  },
+
+  "writeScope": {
+    "_comment": "Platform writes: infra files + ADR/runbook/incident docs in target project + own state + version files. NEVER application code (Builders' territory), NEVER other agents' configs, NEVER deploy configs in production state. Note on enforcement, so this list is not mistaken for one: NOTHING in router/src reads allowedPaths — it documents intent. What actually stops a write is `permissions.deny` (which becomes the SDK's disallowedTools, removing the tool from the model's context) and a PreToolUse hook that denies. `permissions.allow` is NOT a boundary: the SDK's allowedTools only skips the permission prompt (\"to restrict which tools are available, use the `tools` option instead\"), the router never sets `tools`, and its canUseTool allows whatever no hook denies. Platform's Write/Edit sit in `permissions.ask`, which nothing reads, so they are available — bounded by the 72 deny entries and the block_if_path_matches hook below, not by this list.",
+    "allowedPaths": [
+      "<target-project>/docs/architecture/**",
+      "<target-project>/docs/adrs/**",
+      "<target-project>/docs/runbooks/**",
+      "<target-project>/docs/incidents/**",
+      "<target-project>/.github/workflows/**",
+      "<target-project>/.github/actions/**",
+      "<target-project>/Dockerfile*",
+      "<target-project>/docker-compose*.yml",
+      "<target-project>/docker-compose*.yaml",
+      "<target-project>/terraform/**",
+      "<target-project>/pulumi/**",
+      "<target-project>/infra/**",
+      "<target-project>/.dockerignore",
+      "<target-project>/CHANGELOG.md",
+      "<target-project>/package.json",
+      "<target-project>/Cargo.toml",
+      "<target-project>/pyproject.toml",
+      "dev-team-state/global/platform/**",
+      "dev-team-state/projects/*/platform/**"
+    ],
+    "deniedPaths": [
+      "<target-project>/server/**",
+      "<target-project>/client/**",
+      "<target-project>/app/**",
+      "<target-project>/web/**",
+      "<target-project>/api/**",
+      "<target-project>/src/**",
+      "<target-project>/tests/**",
+      "<target-project>/founding/**",
+      "dev-team/agents/**",
+      "dev-team-state/projects/*/strategist/**",
+      "dev-team-state/projects/*/builder-server/**",
+      "dev-team-state/projects/*/builder-client/**",
+      "dev-team-state/projects/*/guardian/**",
+      "dev-team-state/projects/*/marketer/**",
+      "dev-team-state/projects/*/_shared/**"
+    ]
+  },
+
+  "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "Always load: founding docs (the house-style preamble). Small + needed by every skill for project context, so it loads for all sessions incl. the lightweight conversational Q&A default.",
+        "command": "load",
+        "paths": [
+          "<target-project>/founding/PRODUCT.md",
+          "<target-project>/founding/BRAND.md",
+          "<target-project>/founding/STACK.md",
+          "<target-project>/founding/COMPLIANCE.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/founding/COMPLIANCE.md": "ignore"
+        }
+      },
+      {
+        "_comment": "Heavy context — SYSTEM.md + ADR index (Platform writes both — needs them to maintain consistency) + dependency-graph (architect's primary context) — loaded ONLY for the artifact/decision skills that use it. The lightweight `conversational` default skill (bare Q&A / lookups / routing) skips this so a one-line answer doesn't pay to cache-write tens-of-K tokens every session; it reads a specific ADR/SYSTEM.md section on demand instead. See load-hook `only_skills`.",
+        "command": "load",
+        "only_skills": ["system-design", "architect", "devops", "release-manager", "finops", "incident-response"],
+        "paths": [
+          "<target-project>/docs/architecture/SYSTEM.md",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md",
+          "dev-team-state/projects/${PROJECT}/platform/dependency-graph.md"
+        ],
+        "missing": "warn",
+        "missingException": {
+          "<target-project>/docs/architecture/SYSTEM.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/platform/adr-index.md": "ignore_pre_phase_3",
+          "dev-team-state/projects/${PROJECT}/platform/dependency-graph.md": "ignore_first_session"
+        }
+      },
+      {
+        "_comment": "If founding/STACK.md is missing, the architect skill cannot run productively. Refuse architecture work.",
+        "command": "check",
+        "if_missing": [
+          "<target-project>/founding/STACK.md"
+        ],
+        "then": "set_context",
+        "context": "founding_incomplete=true",
+        "message": "Phase 0 STACK.md is missing. Architecture work requires the stack context. Recommend `@strategist-agent kick off Phase 0` first."
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "Block any Write to application code, founding docs, or other agents' configs.",
+        "tool": "Write",
+        "block_if_path_matches": [
+          "<target-project>/server/**",
+          "<target-project>/client/**",
+          "<target-project>/app/**",
+          "<target-project>/api/**",
+          "<target-project>/src/**",
+          "<target-project>/tests/**",
+          "<target-project>/founding/**",
+          "dev-team/agents/**"
+        ],
+        "message": "Platform cannot modify application code, founding docs, or other agents' configs. Bounce this to the appropriate Builder or Strategist agent."
+      },
+      {
+        "_comment": "Production-safety gate on Bash. The deny patterns above are the technical enforcement. If a command tries to bypass — e.g. constructing the deny-listed string at runtime — this hook re-checks the final invocation.",
+        "tool": "Bash",
+        "re_check_against_deny_patterns": true,
+        "on_block_message": "🛑 Production-safety rule: this command would mutate real infrastructure. I cannot execute it. The plan/proposal goes to a human for approval and execution. See `dev-team/agents/platform/CLAUDE.md` → 'The production-safety rule'."
+      },
+      {
+        "_comment": "PR merges are gated.",
+        "tool": "mcp__github__merge_pull_request",
+        "deny_always": true,
+        "message": "Platform does not merge PRs — including its own infra PRs. Blast radius requires human review."
+      }
+    ],
+    "SessionEnd": [
+      {
+        "_comment": "Commit state changes to dev-team-state.",
+        "command": "git_commit",
+        "repo": "dev-team-state",
+        "paths": [
+          "shared/**",
+        "global/platform/**",
+          "projects/${PROJECT}/platform/**"
+        ],
+        "message_template": "[platform] session ${SESSION_ID} — ${SKILL} on ${PROJECT}",
+        "push": true
+      }
+    ]
+  },
+
+  "_implementationNotes": {
+    "production_safety": "The deny list is the most important part of this settings file. Every mutating infra command pattern across major tools (Terraform, Pulumi, Docker, Kubernetes, Helm, AWS CLI, gcloud, deploy tools, curl mutations) is in the deny list. The PreToolUse hook re-checks the final command string in case the agent constructs the command dynamically.",
+    "model": "Sonnet with extended thinking — architecture is judgment under trade-offs; reasoning depth matters most here of any agent.",
+    "writeScope": "Reads everything (architect mandate). Writes narrowly to infra files + docs + own state. Application code and other agents' configs are denied. Enforcement is the deny list + PreToolUse hooks, not allowedPaths (which nothing reads) and not permissions.allow (which only skips the prompt).",
+    "mcp_servers_required": ["linear", "github", "slack (alerts channels)", "billing/cost", "anthropic-usage (for FinOps watching agent fleet spend)", "monitoring/observability (for incident-response read-only diagnostics)"],
+    "future_additions": [
+      "Pre-authorized rollback exception: per Platform SPEC §12 q2, consider a tightly-scoped opt-in where the agent may execute a rollback to the immediately-previous known-good version IF a human has pre-authorized rollback-only for that service. Not in initial settings; revisit after first 90 days of operation.",
+      "A Datadog / observability MCP for richer incident-response read-only diagnostics."
+    ]
+  }
+}
