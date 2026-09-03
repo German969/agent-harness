@@ -231,13 +231,15 @@
   "hooks": {
     "SessionStart": [
       {
-        "_comment": "Always load: founding docs (the house-style preamble). Small + needed by every skill for project context, so it loads for all sessions incl. the lightweight conversational Q&A default.",
+        "_comment": "Always load: founding docs (the house-style preamble). NOT small, measured: the four founding docs are 99KB / ~25K tokens (PRODUCT.md alone is 46KB), cache-written on every session including the Haiku conversational ones. That predates the vault index below and is a separate scoping question — trimming what a light session needs from PRODUCT.md is its own change. Recorded here so the next reader does not trust the word \"small\". Plus the fleet-memory index — shared/README.md and shared/process/README.md, ~4KB / ~1K tokens of table-of-contents with wikilinks, NOT the notes themselves (harness-behavior.md alone is 9KB). Always-on because a vault nobody is told about is not memory: `shared/**` has been on this agent's git_commit paths since the tier was added and no config mentioned it, so the write path was open and the read path did not exist. Follow a wikilink and Read the one note you need — the state repo is already in the session's additionalDirectories. PROTOCOLS.md \u00a78 (Fleet Memory Protocol) says when to read and where a lesson belongs.",
         "command": "load",
         "paths": [
           "<target-project>/founding/PRODUCT.md",
           "<target-project>/founding/BRAND.md",
           "<target-project>/founding/STACK.md",
-          "<target-project>/founding/COMPLIANCE.md"
+          "<target-project>/founding/COMPLIANCE.md",
+          "dev-team-state/shared/README.md",
+          "dev-team-state/shared/process/README.md"
         ],
         "missing": "warn",
         "missingException": {

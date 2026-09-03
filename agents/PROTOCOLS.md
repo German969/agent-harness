@@ -1038,3 +1038,92 @@ With it:
 - The architecture doc stays the canonical truth for the router.
 - The misbehavior log becomes a pattern library that prevents recurrences.
 
+
+---
+
+## 8. Fleet Memory Protocol
+
+`dev-team-state` is a git repo checked out beside `dev-team`, mounted read-write into
+every session, and pushed to origin by the SessionEnd `git_commit` hook. It is not a
+scratch directory — it is the fleet's memory, and the only thing that survives a
+session ending.
+
+### The three tiers
+
+| Path | Whose | Committed by |
+|---|---|---|
+| `shared/` | **everyone's** — process, harness behaviour, external tools, standards, decisions, corrections that cross agents | every agent, and human+Claude sessions through GitHub |
+| `global/<agent>/` | one agent's own state, across every project | that agent only |
+| `projects/<project>/<agent>/` | one agent's state for one project | that agent only |
+| `projects/<project>/_shared/<a>-<b>/` | a documented handoff between two named agents | either of the two |
+
+### Reading it
+
+Every session is given the two index notes — `shared/README.md` and
+`shared/process/README.md` — as SessionStart context. They are tables of contents, not
+the content: follow a `[[wikilink]]` and `Read` the note you need.
+
+**Check `shared/process/` before re-deriving how the harness, the process, or an
+external tool behaves.** Those notes exist because that knowledge was expensive to
+obtain and is not recoverable by reading the code — `harness-behavior.md` in particular
+is a list of places where a config file appears to say one thing and the runtime does
+another. Re-deriving it costs a session and often gets it wrong.
+
+The notes are a **navigable summary; the files their `sources:` block cites are the
+truth.** When the two disagree, the source wins and the note is stale — fix the note in
+the same session rather than leaving the next reader to hit the same thing.
+
+### Recording to it
+
+Write when a correction **generalises past the thing in front of you**. Not every fix:
+a note nobody would act on is cost without benefit.
+
+Where it goes, by kind:
+
+| What you learned | Where it belongs |
+|---|---|
+| A tactical code pattern a reviewer corrected | that Builder's `projects/<project>/<agent>/coding-practices.md` — the `pr-feedback` skill owns this |
+| A correction about the process, the harness, or an external tool | `shared/process/` |
+| A coding or design standard adopted deliberately (not learned from review) | `shared/standards/` |
+| A decision with architecture consequences | an **ADR** in the target project — Platform owns those; the vault indexes them, it does not hold them |
+| Your own working state for a task | `global/<agent>/` or `projects/<project>/<agent>/` |
+
+Every note carries frontmatter: `type`, `updated` (ISO date), `tags`, and `sources` —
+repo-relative paths that are the authority for its claims. A note with no `sources` is
+an opinion.
+
+### Append-mostly, and why it is a rule rather than a style
+
+Two agents editing the same region of a `shared/` note is the one failure mode this
+tier introduces. The state-init sidecar keeps the volume in step with origin by
+**rebasing** local commits onto it; a genuine content conflict aborts that rebase, the
+commit stays local, and **every later push retries the same rebase and fails
+identically** — so the fleet's memory stops leaving the box until a human reconciles it.
+An alert (`state_push_failed`) fires, but the repo stays stuck.
+
+So: **add a new dated section rather than rewriting an existing one.** Correct an
+existing claim in place only when it is wrong, and keep the edit to the lines that are
+wrong. Do not reflow, reorder, or reformat a note you are only adding to.
+
+### Do not
+
+- **Create empty folders or stub notes.** A folder appears when there is something real
+  to put in it; an index of empty stubs costs every session tokens and returns nothing.
+- **Record what happened.** Record what would change a decision. Session logs are for
+  narrative; this is not a log.
+- **Write another agent's tier.** `global/<agent>/` and `projects/<p>/<agent>/` belong to
+  that agent; each SessionEnd hook only commits its own paths, so a write outside them is
+  silently dropped.
+
+### Why this protocol exists
+
+Without it, everything the fleet learns lives in a session transcript nobody reads
+again. Two things that actually happened, both verifiable in this repo's history:
+
+- `coding-practices.md` has never been written for either Builder. The rule that
+  appends to it lives only in the `pr-feedback` skill file, and until the router began
+  delivering skill files to sessions, no session had ever seen it. A place to record
+  lessons existed; the instruction to use it did not arrive.
+- `shared/` has been committable by all seven agents since the tier was added, and not
+  one agent config mentioned it. The write path was open and nothing told anyone the
+  vault was there — which is what this protocol and the index injection fix together.

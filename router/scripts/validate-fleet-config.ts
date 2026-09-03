@@ -23,6 +23,10 @@
 //      now given its skill's markdown as context, so a mapping that points at a
 //      file that is not there delivers no procedure — silently, exactly like the
 //      dead hooks and the stub formatter before it.
+//   6. Every agent is told the fleet vault exists. `shared/**` was committable by
+//      all seven with no config mentioning it: the write path open, the read path
+//      absent. Dropping the index from a load hook would silently restore that,
+//      and no test or session would fail.
 //
 // Exits non-zero listing every problem found, rather than stopping at the first:
 // fixing config one CI run at a time is how a five-minute edit becomes an hour.
@@ -234,6 +238,40 @@ for (const agent of agentSet) {
   }
 }
 
+// 6 — every agent's ALWAYS-ON SessionStart load hook carries the fleet-memory index.
+//     Per PROTOCOLS.md §8, `shared/README.md` + `shared/process/README.md` are how an
+//     agent learns the vault is there at all. Always-on specifically: behind
+//     `only_skills` the cheap conversational sessions — the ones most likely to answer
+//     from memory rather than re-derive — would not see it.
+const VAULT_INDEX_PATHS = [
+  'dev-team-state/shared/README.md',
+  'dev-team-state/shared/process/README.md',
+];
+for (const agent of agents) {
+  let vaultConfig: ReturnType<typeof loadAgentConfig>;
+  try {
+    vaultConfig = loadAgentConfig(agent, { devTeamRoot: repoRoot });
+  } catch {
+    continue; // already reported by check 1
+  }
+  const alwaysOnLoadPaths = (vaultConfig.settings.hooks?.SessionStart ?? [])
+    .filter((e) => {
+      const entry = e as Record<string, unknown>;
+      return entry.command === 'load' && entry.only_skills === undefined;
+    })
+    .flatMap((e) => {
+      const paths = (e as { paths?: unknown }).paths;
+      return Array.isArray(paths) ? (paths as string[]) : [];
+    });
+  for (const required of VAULT_INDEX_PATHS) {
+    if (!alwaysOnLoadPaths.includes(required)) {
+      problems.push(
+        `${agent}: no always-on SessionStart load hook carries '${required}' — the agent would never learn the fleet vault exists (PROTOCOLS.md §8)`,
+      );
+    }
+  }
+}
+
 // 5 — every skill the router can resolve for an agent has a file to deliver.
 //     Before the session was handed its skill's markdown this was cosmetic; now a
 //     missing file means the agent runs the trigger with no procedure at all.
@@ -255,5 +293,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every resolvable skill has a file`,
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every resolvable skill has a file, every agent sees the vault index`,
 );
