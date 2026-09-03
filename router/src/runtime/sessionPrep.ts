@@ -25,6 +25,7 @@ import type { WorkspaceLease } from '../workspace/manager.js';
 import { type ManagerConfig, acquireWorkspace } from '../workspace/manager.js';
 import { gitSessionEnv } from './gitEnv.js';
 import { type PreflightRefusal, runPreflight } from './preflight.js';
+import { skillContextBlock } from './skillContext.js';
 
 export type PrepareRequest = {
   agent: AgentId;
@@ -258,9 +259,27 @@ export async function prepareSession(req: PrepareRequest): Promise<PrepareOutcom
       ctx,
       sessionEnv,
       ...(workspace ? { workspace } : {}),
-      initialContext: preflight.sessionStart.contexts,
+      initialContext: withSkillContext(req, preflight.sessionStart.contexts),
     },
   };
+}
+
+/**
+ * The resolved skill's procedure, first, then whatever the SessionStart `load`
+ * hooks gathered. Order is the point: the skill says what to DO, the loaded files
+ * are what to do it against, and a procedure buried under 40KB of reference reads
+ * as one more document.
+ */
+function withSkillContext(
+  req: PrepareRequest,
+  hookContexts: Array<{ content: string; tag?: string }>,
+): Array<{ content: string; tag?: string }> {
+  const block = skillContextBlock(req.config, req.skill, {
+    agent: req.agent,
+    sessionId: req.sessionId,
+    log: req.log,
+  });
+  return block ? [block, ...hookContexts] : hookContexts;
 }
 
 /**

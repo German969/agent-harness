@@ -11,6 +11,7 @@ import {
 } from '../state/index.js';
 import type { AgentId, SkillId } from '../types.js';
 import { agentFromBotLogin } from './authorship.js';
+import { type MatchReason, isWorkTrigger } from './matchReason.js';
 import { extractMentionedAgent } from './mention.js';
 import type { Registry } from './registry.js';
 import { resolveSkill } from './skill.js';
@@ -34,39 +35,11 @@ export type Classification =
       reason: string;
     };
 
-export type MatchReason =
-  | 'explicit_mention'
-  | 'linear_assignment'
-  | 'github_auto_trigger'
-  | 'github_pr_owner'
-  | 'github_pr_closed'
-  | 'linear_label'
-  | 'slack_channel_default'
-  | 'agent_hint';
+// Re-exported so every existing importer keeps its path; both moved to
+// matchReason.ts, which skill.ts now reads too.
+export { type MatchReason, isWorkTrigger };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Match reasons that mean real work was routed to the agent (a PR opened, a ticket
- * assigned, or a routing-label match) rather than a question. On these, the skill
- * fallback uses the agent's work default; everything else (explicit_mention,
- * slack_channel_default, agent_hint) falls back to the conversational skill.
- */
-/**
- * Is this match a unit of WORK (a ticket assigned/labelled, a PR opened) rather
- * than a question? Work sessions get the agent's real work skill and a writable
- * worktree; conversations get neither.
- */
-export function isWorkTrigger(reason: MatchReason): boolean {
-  return WORK_TRIGGER_REASONS.has(reason);
-}
-
-const WORK_TRIGGER_REASONS: ReadonlySet<MatchReason> = new Set<MatchReason>([
-  'linear_assignment',
-  'github_auto_trigger',
-  'github_pr_owner',
-  'linear_label',
-]);
 
 /** PR-owner label convention: a `agent:<name>` label designates the owner agent. */
 const OWNER_LABEL_PREFIX = 'agent:';
@@ -185,7 +158,7 @@ function classifyGithub(event: WebhookEvent, deps: ClassifyDeps): Classification
     // did exactly that usefully. But it is NOT work: there is nothing left to
     // build, so loading the full work skill and leasing a worktree buys nothing
     // and costs a Sonnet session. `github_pr_closed` is deliberately absent from
-    // WORK_TRIGGER_REASONS, which routes it to the cheap conversational skill with
+    // the work-trigger set (matchReason.ts), so it takes the cheap conversational skill with
     // no checkout.
     const reason =
       event.event_type === 'pull_request.closed' ? 'github_pr_closed' : 'github_pr_owner';
@@ -393,7 +366,7 @@ function buildAgentClassification(
   agent: AgentId,
   reason: MatchReason,
 ): Classification {
-  const skill = resolveSkill(agent, event, { workTrigger: WORK_TRIGGER_REASONS.has(reason) });
+  const skill = resolveSkill(agent, event, { reason });
   const thread_key = buildThreadKey(event);
   const continuation = decideContinuation(event, deps, agent, thread_key);
   return { route: 'agent', agent, skill, thread_key, continuation, match_reason: reason };

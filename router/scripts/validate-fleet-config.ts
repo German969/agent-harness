@@ -19,11 +19,15 @@
 //   4. Identity files parse, and agents and identities correspond 1:1 — an identity
 //      with no agent directory routes events to a config that cannot load, and an
 //      agent with no identity can never be routed to at all.
+//   5. Every skill the router can resolve for an agent has a file. The session is
+//      now given its skill's markdown as context, so a mapping that points at a
+//      file that is not there delivers no procedure — silently, exactly like the
+//      dead hooks and the stub formatter before it.
 //
 // Exits non-zero listing every problem found, rather than stopping at the first:
 // fixing config one CI run at a time is how a five-minute edit becomes an hour.
 
-import { readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAgentConfig } from '../src/config/agentLoader.js';
@@ -34,6 +38,7 @@ import {
   inferCommand,
 } from '../src/hooks/registry.js';
 import { loadIdentities } from '../src/routing/loader.js';
+import { resolvableSkills } from '../src/routing/skill.js';
 import { auditFleetModels } from '../src/runtime/modelCheck.js';
 import { builtinToolsFrom } from '../src/runtime/toolAllowlist.js';
 import type { AgentId } from '../src/types.js';
@@ -229,6 +234,20 @@ for (const agent of agentSet) {
   }
 }
 
+// 5 — every skill the router can resolve for an agent has a file to deliver.
+//     Before the session was handed its skill's markdown this was cosmetic; now a
+//     missing file means the agent runs the trigger with no procedure at all.
+for (const agent of agents) {
+  for (const skill of resolvableSkills(agent)) {
+    const path = join(repoRoot, 'agents', agent, 'skills', `${skill}.md`);
+    if (!existsSync(path)) {
+      problems.push(
+        `${agent}: the router can resolve skill '${skill}' but agents/${agent}/skills/${skill}.md does not exist — that session would run with no procedure`,
+      );
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error(`fleet config invalid — ${problems.length} problem(s):\n`);
   for (const p of problems) console.error(`  - ${p}`);
@@ -236,5 +255,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced`,
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every resolvable skill has a file`,
 );

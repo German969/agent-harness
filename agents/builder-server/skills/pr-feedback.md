@@ -12,7 +12,10 @@ description: React to events on existing PRs — CI failures, review comments, c
 - **Review submitted** with status `CHANGES_REQUESTED` on a `@server-agent` PR
 - **Push by a human** to a branch owned by `@server-agent`
 
-These triggers fire webhooks; Cyrus re-invokes Builder-Server with the `pr-feedback` skill loaded.
+These triggers fire webhooks. The router classifies an event on a PR this agent owns as
+`github_pr_owner`, resolves it to this skill, and delivers this file as the session's
+active-skill context. Until that mapping existed the router resolved those events to
+`backend` — the full development cycle — and this procedure never ran.
 
 ## Specialized knowledge
 

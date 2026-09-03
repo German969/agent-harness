@@ -11,6 +11,7 @@
 
 import type { WebhookEvent } from '../ingress/types.js';
 import type { AgentId, SkillId } from '../types.js';
+import { type MatchReason, isWorkTrigger } from './matchReason.js';
 
 /** Known selectors that appear in "@<agent>-bot <selector> ..." patterns. */
 const AGENT_SKILL_SELECTORS: Record<AgentId, Record<string, SkillId>> = {
@@ -80,6 +81,17 @@ const FOUNDING_INTENT =
 const MEMO_INTENT =
   /\b(log|record|save|note|remember)\b[^.!?\n]{0,50}\b((to|in)\s+(your\s+|my\s+)?(memory|decisions)|recent[- ]?decisions?)\b/i;
 
+/**
+ * Strategist's phrase intents, in precedence order. A table rather than two
+ * inline `if`s so `resolvableSkills` below reads the SAME source the resolver
+ * does — a separately-maintained list of "skills this agent can reach" is exactly
+ * the kind of second copy that goes stale and defeats the check it feeds.
+ */
+const STRATEGIST_INTENTS: ReadonlyArray<{ pattern: RegExp; skill: SkillId }> = [
+  { pattern: FOUNDING_INTENT, skill: 'founding' },
+  { pattern: MEMO_INTENT, skill: 'memo' },
+];
+
 /** Linear label → skill (checked when the ticket carries the label). */
 const LABEL_SKILLS: Record<string, SkillId> = {
   prd: 'pm',
@@ -129,10 +141,37 @@ const WORK_DEFAULT_SKILLS: Record<AgentId, SkillId> = {
  */
 const CONVERSATION_DEFAULT: SkillId = 'conversational';
 
+/**
+ * `github_pr_owner` — an event on a PR this agent owns: a review comment, a
+ * change request, a human push to its branch, or a CI run that finished red.
+ *
+ * These are work, so they took WORK_DEFAULT_SKILLS: `backend` for Builder-Server.
+ * That is the wrong procedure. `backend` is the full development cycle, which
+ * opens by reading a ticket and planning an implementation; reacting to one review
+ * comment is a different job with a different shape, and the fleet has had a skill
+ * for it all along. `pr-feedback` is named as the handler in both Builders'
+ * CLAUDE.md skill tables, in their SPECs ("Phase 7 — React (via `pr-feedback`
+ * skill)"), and in their `only_skills` heavy-context load hooks — and the router
+ * could never select it, because nothing mapped a reason to it.
+ *
+ * Its lesson-capture step is the reason this matters beyond tidiness: the rule for
+ * appending a validated review lesson to `coding-practices.md` exists only in
+ * `pr-feedback.md`. No session has ever run that skill, and the file has never
+ * been written.
+ *
+ * Only the two agents that HAVE the skill are listed. Guardian, Harness and
+ * Platform can own PRs too; they fall through to their work default, which is the
+ * behaviour they have today.
+ */
+const PR_FEEDBACK_SKILLS: Partial<Record<AgentId, SkillId>> = {
+  'builder-server': 'pr-feedback',
+  'builder-client': 'pr-feedback',
+};
+
 export function resolveSkill(
   agent: AgentId,
   event: WebhookEvent,
-  opts: { workTrigger?: boolean } = {},
+  opts: { reason?: MatchReason } = {},
 ): SkillId {
   // 1. Explicit selector from message text
   const selector = extractSelector(agent, event);
@@ -144,20 +183,32 @@ export function resolveSkill(
     if (label && LABEL_SKILLS[label]) return LABEL_SKILLS[label] as SkillId;
   }
 
-  // 2b. Strategist phrase intents (matched anywhere in the text). Founding is
-  //     checked before memo — a founding session already persists its own state.
+  // 2b. Strategist phrase intents (matched anywhere in the text), in table order —
+  //     founding before memo, since a founding session already persists its own state.
   if (agent === 'strategist') {
     const text = extractText(event);
-    if (text && FOUNDING_INTENT.test(text)) return 'founding';
-    if (text && MEMO_INTENT.test(text)) return 'memo';
+    if (text) {
+      for (const { pattern, skill } of STRATEGIST_INTENTS) {
+        if (pattern.test(text)) return skill;
+      }
+    }
   }
 
-  // 3. Fallback split by trigger kind. A work auto-trigger (PR opened, ticket
+  // 3. Reason-specific work skill. An event on a PR the agent owns is work, but
+  //    not the SAME work as a fresh ticket — see PR_FEEDBACK_SKILLS.
+  if (opts.reason === 'github_pr_owner') {
+    const prSkill = PR_FEEDBACK_SKILLS[agent];
+    if (prSkill) return prSkill;
+  }
+
+  // 4. Fallback split by trigger kind. A work trigger (PR opened, ticket
   //    assigned/label-routed) is real work → the agent's work default, whose
   //    CLAUDE.md fans out (e.g. Guardian qa → qa+security). A bare mention /
   //    channel message / addressed-but-unmatched event is a question → the
   //    lightweight conversational skill (cheap model, no heavy context load).
-  return opts.workTrigger ? WORK_DEFAULT_SKILLS[agent] : CONVERSATION_DEFAULT;
+  return opts.reason && isWorkTrigger(opts.reason)
+    ? WORK_DEFAULT_SKILLS[agent]
+    : CONVERSATION_DEFAULT;
 }
 
 function extractSelector(agent: AgentId, event: WebhookEvent): SkillId | undefined {
@@ -223,4 +274,30 @@ function extractFirstMatchingLabel(event: WebhookEvent): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Every skill `resolveSkill` can return for `agent` — the set CI checks has a
+ * file at `agents/<agent>/skills/<skill>.md`. Routing to a skill with no file
+ * delivers no procedure at all, which is the gap this whole change closes; a
+ * mapping that can silently point at nothing would reopen it one level up.
+ *
+ * Derived from the same maps the resolver reads, so it cannot drift.
+ *
+ * LABEL_SKILLS is deliberately excluded. It maps a Linear LABEL to a skill with
+ * no reference to an agent, so every agent nominally "can" reach `pm` or
+ * `campaign-lead`; which agent-label pairs actually occur is a routing question,
+ * not a skill-resolution one, and asserting it here would invent failures.
+ */
+export function resolvableSkills(agent: AgentId): SkillId[] {
+  const prFeedback = PR_FEEDBACK_SKILLS[agent];
+  return [
+    ...new Set<SkillId>([
+      ...Object.values(AGENT_SKILL_SELECTORS[agent] ?? {}),
+      ...(prFeedback ? [prFeedback] : []),
+      ...(agent === 'strategist' ? STRATEGIST_INTENTS.map((i) => i.skill) : []),
+      WORK_DEFAULT_SKILLS[agent],
+      CONVERSATION_DEFAULT,
+    ]),
+  ];
 }
