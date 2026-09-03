@@ -94,11 +94,8 @@
       "Bash(hadolint:*)",
       "Bash(shellcheck:*)"
     ],
-    "ask": [
-      "mcp__github__create_pull_request",
-      "mcp__github__create_release",
-      "mcp__linear__update_issue_status"
-    ],
+    "_ask_comment": "`ask` is READ BY NOTHING. sdkCall passes permissions.allow (allowedTools) and permissions.deny (disallowedTools); no code in router/src reads this field. A tool parked here was not gated behind a prompt — it was simply available, undocumented. Deliberately empty: every entry was resolved to allow, to deny, or deleted as unreachable. Do not re-add — put the tool in allow or deny, or leave it out. Resolved: mcp__github__create_pull_request and mcp__github__create_release moved to `deny`. Bash(git push:*) is already denied and the only git_commit hook targets dev-team-state, so no branch in the target repo can exist to open a PR from; and the sanctioned release path is already create_release_draft (allow) then a human, with publish_release denied. mcp__linear__update_issue_status was deleted: no such tool exists — linearMcp.ts's status tool is `move_issue`, in the gated tier.",
+    "ask": [],
     "deny": [
       "Bash(terraform apply:*)",
       "Bash(terraform destroy:*)",
@@ -181,7 +178,9 @@
       "mcp__email__send",
       "mcp__deploy__*",
       "mcp__secrets__rotate*",
-      "mcp__secrets__delete*"
+      "mcp__secrets__delete*",
+      "mcp__github__create_pull_request",
+      "mcp__github__create_release"
     ],
     "defaultMode": "default"
   },

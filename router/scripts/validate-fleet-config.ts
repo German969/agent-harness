@@ -14,7 +14,9 @@
 // Checks, in the order a person would ask them:
 //   1. Every agent directory loads — settings.json and mcp.json pass their schemas.
 //   2. Every hook command has a registered handler (the hook schema is open-shaped
-//      on purpose, so a typo validates fine and then silently does nothing).
+//      on purpose, so a typo validates fine and then silently does nothing), and
+//      `permissions.ask` is empty — nothing reads it, so an entry there is a tool
+//      that is available while the config says it is gated.
 //   3. Every model, including per-skill overrides, is priced by the rate table.
 //   4. Identity files parse, and agents and identities correspond 1:1 — an identity
 //      with no agent directory routes events to a config that cannot load, and an
@@ -157,30 +159,29 @@ for (const known of KNOWN_STUBBED_HOOKS) {
   }
 }
 
-// 2b — `permissions.ask` reaches nothing. sdkCall passes only `permissions.allow`
-// (allowedTools) and `permissions.deny` (deniedTools); no code anywhere in
-// router/src reads `ask`. A tool listed ONLY under `ask` is therefore not gated
-// behind a human prompt — it is simply absent, because it never enters
-// allowedTools. That direction is fail-safe, so this reports rather than fails;
-// what it must not do is stay invisible, since the config reads as a working
-// human-in-the-loop tier that does not exist.
-const askOnly: string[] = [];
+// 2b — `permissions.ask` must stay EMPTY. sdkCall passes only permissions.allow
+// (allowedTools) and permissions.deny (disallowedTools); no code anywhere in
+// router/src reads `ask`. A tool parked there was never gated behind a human
+// prompt — it was simply available and undocumented, which is worse than either
+// tier on its own.
+//
+// This was a note for one release, listing 27 such tools across all seven agents.
+// Every one has now been resolved to allow, to deny, or deleted as naming a tool
+// or a server that does not exist, so the note becomes a gate: any new entry is by
+// construction either a lie about a gate or a tool nobody decided on.
 for (const agent of agents) {
+  let ask: readonly string[];
   try {
-    const { permissions } = loadAgentConfig(agent, { devTeamRoot: repoRoot }).settings;
-    const allow = new Set(permissions.allow);
-    for (const tool of permissions.ask ?? []) {
-      if (!tool.startsWith('_') && !allow.has(tool)) askOnly.push(`${agent}: ${tool}`);
-    }
+    ask = loadAgentConfig(agent, { devTeamRoot: repoRoot }).settings.permissions.ask ?? [];
   } catch {
-    // Already reported above.
+    continue; // Already reported above.
   }
-}
-if (askOnly.length > 0) {
-  console.warn(
-    `note: ${askOnly.length} tool(s) are listed only under permissions.ask, which nothing reads — they are unavailable, not gated:`,
-  );
-  for (const entry of askOnly) console.warn(`  - ${entry}`);
+  for (const tool of ask) {
+    if (tool.startsWith('_')) continue;
+    problems.push(
+      `${agent}: permissions.ask lists '${tool}', but nothing reads that field — put it in allow (available) or deny (blocked), or leave it out`,
+    );
+  }
 }
 
 // 2c — permissions.allow is now a REAL restriction: it becomes the SDK's `tools`,

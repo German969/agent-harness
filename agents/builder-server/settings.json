@@ -84,11 +84,8 @@
       "Bash(git push -u origin agent/:*)",
       "Bash(git push origin agent/:*)"
     ],
-    "ask": [
-      "mcp__linear__update_issue_status",
-      "mcp__linear__assign_issue",
-      "mcp__linear__close_issue"
-    ],
+    "_ask_comment": "`ask` is READ BY NOTHING. sdkCall passes permissions.allow (allowedTools) and permissions.deny (disallowedTools); no code in router/src reads this field. A tool parked here was not gated behind a prompt — it was simply available, undocumented. Deliberately empty: every entry was resolved to allow, to deny, or deleted as unreachable. Do not re-add — put the tool in allow or deny, or leave it out. Resolved by deletion, all three unreachable. mcp__linear__update_issue_status is not a tool that exists (linearMcp.ts's status tool is `move_issue`). assign_issue and close_issue are in the GATED tier, and this agent's mcp.json sets no gated_mutations — its own comment says move/assign/close \"stay out of reach entirely\".",
+    "ask": [],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push --no-verify:*)",

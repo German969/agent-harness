@@ -101,12 +101,8 @@
       "Bash(k6:*)",
       "Bash(artillery:*)"
     ],
-    "ask": [
-      "Bash(git push:*)",
-      "mcp__linear__update_issue_status",
-      "mcp__linear__assign_issue",
-      "mcp__linear__close_issue"
-    ],
+    "_ask_comment": "`ask` is READ BY NOTHING. sdkCall passes permissions.allow (allowedTools) and permissions.deny (disallowedTools); no code in router/src reads this field. A tool parked here was not gated behind a prompt — it was simply available, undocumented. Deliberately empty: every entry was resolved to allow, to deny, or deleted as unreachable. Do not re-add — put the tool in allow or deny, or leave it out. Resolved by deletion. The three mcp__linear__* entries name a server this agent does not have: its mcp.json carries `_linear`, and `_`-prefixed servers are skipped by both activeServers() and collectInProcessMcp(), so Guardian has NO Linear tools at all — see the note on the allow list. Bash(git push:*) went too: `allow` already carries the two SCOPED grants (git push origin agent/:*), and every agent has a real PreToolUse gate blocking pushes to main/staging/production, so a broad unread entry only misled.",
+    "ask": [],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push --no-verify:*)",

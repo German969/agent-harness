@@ -57,17 +57,15 @@
       "Bash(git diff:*)",
       "Bash(git show:*)",
       "Bash(git blame:*)",
-      "Bash(git status)"
-    ],
-    "_ask_comment": "The gated Linear mutation tools (move_issue / set_milestone / assign_issue / set_due_date / close_issue) are authorized structurally: the router only EXPOSES them in a human-command session (explicit @-mention on this agent, gated_mutations:true in mcp.json). Listed here to document the gated surface; delete/archive remain denied below and have no tool.",
-    "ask": [
-      "mcp__github__create_pull_request",
+      "Bash(git status)",
       "mcp__linear__move_issue",
       "mcp__linear__set_milestone",
       "mcp__linear__assign_issue",
       "mcp__linear__set_due_date",
       "mcp__linear__close_issue"
     ],
+    "_ask_comment": "`ask` is READ BY NOTHING. sdkCall passes permissions.allow (allowedTools) and permissions.deny (disallowedTools); no code in router/src reads this field. A tool parked here was not gated behind a prompt — it was simply available, undocumented. Deliberately empty: every entry was resolved to allow, to deny, or deleted as unreachable. Do not re-add — put the tool in allow or deny, or leave it out. Resolved: the five gated Linear mutations moved to `allow` — they are real tools (router/src/linear/linearMcp.ts gatedTools) and the gate is STRUCTURAL, since the router exposes them only in a human-command session (gated_mutations:true + explicit_mention), exactly as this agent's CLAUDE.md Linear table describes. mcp__github__create_pull_request moved to `deny`: this agent's own \"cannot do\" list forbids `git push`, so it can never produce the head ref a PR needs.",
+    "ask": [],
     "deny": [
       "Bash(git push:*)",
       "Bash(git commit:*)",
@@ -104,7 +102,8 @@
       "mcp__github__get_pull_request_status",
       "mcp__github__get_pull_request_reviews",
       "mcp__github__get_pull_request_comments",
-      "NotebookEdit"
+      "NotebookEdit",
+      "mcp__github__create_pull_request"
     ],
     "defaultMode": "default"
   },

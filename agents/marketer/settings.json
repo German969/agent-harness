@@ -95,15 +95,13 @@
 
       "Bash(prettier:*)",
       "Bash(markdownlint:*)",
-      "Bash(eslint:*)"
+      "Bash(eslint:*)",
+      "mcp__github__create_pull_request",
+      "Bash(git push -u origin agent/:*)",
+      "Bash(git push origin agent/:*)"
     ],
-    "ask": [
-      "Bash(git push:*)",
-      "mcp__linear__update_issue_status",
-      "mcp__linear__assign_issue",
-      "mcp__linear__close_issue",
-      "mcp__github__create_pull_request"
-    ],
+    "_ask_comment": "`ask` is READ BY NOTHING. sdkCall passes permissions.allow (allowedTools) and permissions.deny (disallowedTools); no code in router/src reads this field. A tool parked here was not gated behind a prompt — it was simply available, undocumented. Deliberately empty: every entry was resolved to allow, to deny, or deleted as unreachable. Do not re-add — put the tool in allow or deny, or leave it out. Resolved. The three mcp__linear__* entries were deleted: mcp.json carries `_linear`, which activeServers() and collectInProcessMcp() both skip, so Marketer has NO Linear tools. mcp__github__create_pull_request moved to `allow` rather than deny, because it is currently Marketer's ONLY route to its documented output: the SessionEnd `create_pr: true` path returns a \"PR queued\" side-effect that nothing consumes (git_commit_if_changed.ts defers it to \"Phase 6d\", which never wired it), so no PR is opened by the hook. Scoped push grants added alongside, mirroring Guardian's, since a PR needs a pushed head ref.",
+    "ask": [],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push --no-verify:*)",
