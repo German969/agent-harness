@@ -7,7 +7,7 @@ description: Quality assurance — coverage check, missing-test detection, bug-r
 
 ## Activate when
 
-- Auto-fires on every PR with code changes (Light or Deep tier)
+- Auto-fires on every PR with code changes. Step 0 below decides the tier — skip, light or deep.
 - Linear bug assignment (`@guardian-agent reproduce ENG-1234`)
 - `@guardian-agent coverage <path>` for explicit invocation
 
@@ -18,6 +18,36 @@ description: Quality assurance — coverage check, missing-test detection, bug-r
 - **Integration-test ownership** per the [API Contract Protocol](../../PROTOCOLS.md#integration-verification): when a feature crosses the API boundary, QA owns the e2e test that exercises the real endpoint through the real client path
 - **Common test gaps**: error paths missing, edge cases (empty / null / large / boundary) missing, async race conditions untested, retry logic untested
 - **Flake detection**: distinguishing intermittent failures from deterministic ones
+
+## Step 0 — classify the path tier (PR-triggered only)
+
+Do this FIRST, before reading any code. It decides how deep the rest of the scan
+goes and whether a comment is posted at all, and it is the reason the tier table is
+loaded into this session.
+
+1. **Get the changed files.** The session's `[PR context]` header names the repo and
+   PR number. Use `pull_request_read` (`get_files`) on it. The local checkout is on
+   the BASE branch and does not have the changes — do not `git diff` for this.
+2. **Match every changed path** against `agents/guardian/sensitive-paths.yml`, which
+   is in this session's context.
+3. **Pick the tier**, per AGENTS.md "Guardian auto-trigger — three-tier path scan":
+
+   | Tier | When | Scan | Comment |
+   |---|---|---|---|
+   | **deep** | ANY changed path matches a `patterns` entry | full QA + threat-model diff + auth/authz review + perf + compliance | **always**, even "all clear" |
+   | **skip** | EVERY changed path matches the `skip` list (docs, `*.md`, CODEOWNERS, LICENSE) | none | none |
+   | **light** | anything else | quick coverage, dep-CVE, secret leak, design-system compliance | only if findings |
+
+   Deep wins. A PR touching both `docs/**` and a deep path is deep — the skip list
+   spares a docs-only PR, it is not an escape hatch.
+
+4. **Say which tier you picked and why** at the top of the review comment, naming the
+   matched glob. A deep scan nobody can tell happened is worth as much as one that
+   did not run — which is exactly what this step replaced.
+5. **If a changed path looks sensitive and matches NO pattern**, that is a
+   sensitive-path candidate: scan it at deep tier anyway, and raise the addition per
+   the [Sensitive-Paths Protocol](../../PROTOCOLS.md#2-sensitive-paths-protocol).
+   You own that file; a producer proposing is the other half of the same loop.
 
 ## Procedure (PR-triggered)
 

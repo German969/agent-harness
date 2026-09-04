@@ -25,7 +25,10 @@
 //      now given its skill's markdown as context, so a mapping that points at a
 //      file that is not there delivers no procedure — silently, exactly like the
 //      dead hooks and the stub formatter before it.
-//   6. Every agent is told the fleet vault exists. `shared/**` was committable by
+//   6. Guardian's sensitive-paths.yml exists and every entry is well-formed. It is
+//      the tier table AGENTS.md, PROTOCOLS.md §2 and Strategist's curator all point
+//      at, and a malformed entry reads as coverage that is not there.
+//   7. Every agent is told the fleet vault exists. `shared/**` was committable by
 //      all seven with no config mentioning it: the write path open, the read path
 //      absent. Dropping the index from a load hook would silently restore that,
 //      and no test or session would fail.
@@ -33,7 +36,8 @@
 // Exits non-zero listing every problem found, rather than stopping at the first:
 // fixing config one CI run at a time is how a five-minute edit becomes an hour.
 
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { load } from 'js-yaml';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAgentConfig } from '../src/config/agentLoader.js';
@@ -80,9 +84,11 @@ if (agents.length === 0) problems.push('agents/: no agent directories found');
  * enumerated and visible, and any NEW dead hook fails CI. Delete an entry when its
  * handler lands — a stale entry here is itself reported below.
  */
-const KNOWN_DEAD_HOOKS = new Set([
-  // Explicit `command` values with no handler.
-  'guardian/SessionStart/classify_path_tier',
+const KNOWN_DEAD_HOOKS = new Set<string>([
+  // Empty. classify_path_tier — the last entry — was removed rather than
+  // implemented: a SessionStart handler runs before the worktree and before
+  // secrets, so it could never have had the PR's changed files. See the comment
+  // on guardian's replacement `load` hook.
 ]);
 
 /**
@@ -239,7 +245,75 @@ for (const agent of agentSet) {
   }
 }
 
-// 6 — every agent's ALWAYS-ON SessionStart load hook carries the fleet-memory index.
+// 6 — Guardian's sensitive-paths.yml parses and every entry is well-formed.
+//     Three separate documents route readers here (AGENTS.md's tier table,
+//     PROTOCOLS.md §2, Strategist's curator backstop) and the file did not exist at
+//     all until it was written. A silently malformed entry is the failure that
+//     matters: the tier table would still load, and a deep path would review light.
+const sensitivePathsFile = join(repoRoot, 'agents', 'guardian', 'sensitive-paths.yml');
+try {
+  const doc = load(readFileSync(sensitivePathsFile, 'utf-8')) as {
+    families?: unknown;
+    skip?: unknown;
+    patterns?: unknown;
+  };
+  const families = Array.isArray(doc?.families) ? (doc.families as string[]) : undefined;
+  if (!families || families.length === 0) {
+    problems.push('guardian/sensitive-paths.yml: `families` is missing or empty');
+  }
+  if (!Array.isArray(doc?.skip)) {
+    problems.push('guardian/sensitive-paths.yml: `skip` must be a list of globs');
+  }
+  const patterns = Array.isArray(doc?.patterns) ? doc.patterns : undefined;
+  if (!patterns || patterns.length === 0) {
+    problems.push('guardian/sensitive-paths.yml: `patterns` is missing or empty');
+  } else {
+    const famSet = new Set(families ?? []);
+    const seen = new Set<string>();
+    for (const raw of patterns) {
+      const entry = raw as Record<string, unknown>;
+      const glob = typeof entry.glob === 'string' ? entry.glob : undefined;
+      if (!glob) {
+        problems.push(`guardian/sensitive-paths.yml: an entry has no \`glob\`: ${JSON.stringify(raw)}`);
+        continue;
+      }
+      if (seen.has(glob)) {
+        problems.push(`guardian/sensitive-paths.yml: duplicate glob '${glob}'`);
+      }
+      seen.add(glob);
+      // `reason` is not decoration: PROTOCOLS.md §2 requires every addition to say
+      // why, so a future reader can judge whether it still applies.
+      for (const field of ['family', 'reason'] as const) {
+        if (typeof entry[field] !== 'string' || (entry[field] as string).trim() === '') {
+          problems.push(`guardian/sensitive-paths.yml: '${glob}' has no \`${field}\``);
+        }
+      }
+      // `added` is an unquoted ISO date, which js-yaml resolves to a Date rather
+      // than a string — accept either, and reject only a missing or unparseable one.
+      // (Requiring a string here failed the whole file on its first run, which is
+      // the check being wrong rather than the data.)
+      const added = entry.added;
+      const addedOk =
+        added instanceof Date
+          ? !Number.isNaN(added.getTime())
+          : typeof added === 'string' && added.trim() !== '';
+      if (!addedOk) {
+        problems.push(`guardian/sensitive-paths.yml: '${glob}' has no usable \`added\` date`);
+      }
+      if (typeof entry.family === 'string' && !famSet.has(entry.family)) {
+        problems.push(
+          `guardian/sensitive-paths.yml: '${glob}' names family '${entry.family}', which is not in the declared families list`,
+        );
+      }
+    }
+  }
+} catch (err) {
+  problems.push(
+    `guardian/sensitive-paths.yml: could not read or parse — ${(err as Error).message}`,
+  );
+}
+
+// 7 — every agent's ALWAYS-ON SessionStart load hook carries the fleet-memory index.
 //     Per PROTOCOLS.md §8, `shared/README.md` + `shared/process/README.md` are how an
 //     agent learns the vault is there at all. Always-on specifically: behind
 //     `only_skills` the cheap conversational sessions — the ones most likely to answer
@@ -294,5 +368,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every resolvable skill has a file, every agent sees the vault index`,
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every resolvable skill has a file, every agent sees the vault index, sensitive-paths.yml well-formed`,
 );

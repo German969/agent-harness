@@ -260,10 +260,18 @@
         "message": "Cannot do substantive review work without STACK.md and SYSTEM.md. Recommend `@strategist-agent kick off Phase 0` and `@platform-agent design the system architecture` first."
       },
       {
-        "_comment": "On every PR-triggered session, classify the path tier based on sensitive-paths.yml. Stores the classification in context for skills to consume.",
-        "command": "classify_path_tier",
-        "trigger_only": "pull_request",
-        "result_context": "path_tier"
+        "_comment": "Loads the path-tier table Guardian classifies PRs with. This REPLACES a `classify_path_tier` hook that sat here doing nothing, and could not have done it: SessionStart hooks run in preflight, BEFORE the worktree is leased and BEFORE secrets resolve, so a handler here has no checkout, no GitHub token and no PR number (SessionContext.trigger carries kind/provider/thread_key/message/match_reason and nothing else). GitHub's pull_request payload does not include a file list either — it must be fetched — so no handler in this phase could ever have classified anything. Its `trigger_only` and `result_context` keys were read by nothing as well. The classification now happens where the data actually is: the session's [PR context] header names the repo and PR number and points at the GitHub MCP for the changed files, and the `qa` skill (delivered as session context since the router started passing skill files) carries the procedure. This hook's job is to put the table in front of it.",
+        "command": "load",
+        "only_skills": [
+          "qa",
+          "security",
+          "llm-security",
+          "compliance"
+        ],
+        "paths": [
+          "dev-team/agents/guardian/sensitive-paths.yml"
+        ],
+        "missing": "warn"
       }
     ],
     "PreToolUse": [

@@ -1,0 +1,143 @@
+# Guardian's path-tier classification — the file AGENTS.md, PROTOCOLS.md §2,
+# Guardian's SPEC and Strategist's `curator` skill have all referenced since they
+# were written, and which did not exist until now.
+#
+# WHO READS THIS
+#   - Guardian, in its `qa` skill, on every PR-triggered session. It classifies
+#     the PR's changed files (fetched from the GitHub MCP — the local checkout is
+#     on the base branch) and picks its scan depth from the result.
+#   - Strategist's `curator` skill, weekly, as the drift backstop: walk the
+#     codebase for paths matching a family, cross-reference here, propose what is
+#     missing (PROTOCOLS.md §2, "Knowledge Curator backstop").
+#   - `pnpm validate:fleet`, which checks this file parses and every entry is
+#     well-formed. A malformed entry is worse than a missing one: it reads as
+#     coverage that is not there.
+#
+# WHO WRITES IT
+#   Guardian only. Code-writing agents propose additions as a PR comment and never
+#   edit this file — PROTOCOLS.md §2, "Producer responsibilities". The target
+#   project keeps its own producer-side copy of the FAMILIES at
+#   `tools/guardrails/src/families.ts`, with the paths it has already dispositioned
+#   in `.github/sensitive-path-candidates.json`. That copy exists to decide whether
+#   to *prompt* a proposal; this file is the authority. When they disagree, this
+#   one wins and the copy is stale.
+#
+# TIERS — AGENTS.md "Guardian auto-trigger — three-tier path scan"
+#   skip   docs and prose only. No scan, no comment.
+#   light  any other code path. Quick QA coverage, dep-CVE scan, secret leak,
+#          design-system compliance. Comment only if there are findings.
+#   deep   anything matching a `patterns` entry below. Full QA + threat-model diff
+#          + auth/authz review + perf + compliance. ALWAYS comments, even "all
+#          clear", so a reviewer can see the deep scan ran.
+#
+# PRECEDENCE: deep wins. A PR touching both `docs/**` and a deep path is deep —
+# the skip list is not an escape hatch, it only spares a docs-only PR.
+
+version: 1
+
+# The families a `patterns` entry may name. Transcribed from PROTOCOLS.md §2's
+# table; `user-data` is in the protocol and absent from the producer-side copy,
+# which is a known gap in that copy rather than in the protocol.
+families:
+  - auth
+  - payments
+  - secrets
+  - user-data
+  - migrations
+  - infra
+  - ai-prompts
+  - webhooks
+  - audit
+
+# Docs-only changes. Matched against the WHOLE changed-file set: if every changed
+# path matches one of these, the tier is skip.
+skip:
+  - "docs/**"
+  - "**/*.md"
+  - "CODEOWNERS"
+  - "LICENSE"
+  - ".github/CODEOWNERS"
+
+# Deep-tier patterns. Every entry carries why it was added, per PROTOCOLS.md §2
+# ("Each addition carries a brief comment explaining why it was added").
+#
+# Two kinds live here on purpose. FAMILY patterns are generic and mostly match
+# nothing today — they exist so the first commit at such a path is deep-scanned
+# rather than noticed a release later. CONCRETE patterns name code that exists in
+# the target project right now.
+patterns:
+  # --- family patterns: broad, forward-looking ---
+  - glob: "**/auth*/**"
+    family: auth
+    added: 2026-09-03
+    reason: "Family pattern. No auth module exists in iris yet; this is here so the first one is deep-scanned on the PR that introduces it, not on the PR after somebody notices."
+  - glob: "**/{authentication,authorization,permissions,sessions,rbac}/**"
+    family: auth
+    added: 2026-09-03
+    reason: "Family pattern, the named-directory half of the auth family in PROTOCOLS.md §2."
+  - glob: "**/{payment,payments,billing,subscription,subscriptions,invoice,invoices}/**"
+    family: payments
+    added: 2026-09-03
+    reason: "Family pattern. Iris is a paid product (founding/PRODUCT.md); billing code is expected and must never land at light tier."
+  - glob: "**/{stripe,paddle,chargebee}*"
+    family: payments
+    added: 2026-09-03
+    reason: "Family pattern — payment processor integrations, named by vendor as PROTOCOLS.md §2 lists them."
+  - glob: "**/{secret,secrets,credentials,vault}*/**"
+    family: secrets
+    added: 2026-09-03
+    reason: "Family pattern. Secret handling is the one family where a shallow review has no acceptable failure mode."
+  - glob: "**/*.env*"
+    family: secrets
+    added: 2026-09-03
+    reason: "Family pattern. An env file in a diff is either a leak or a config change that decides where secrets come from; both want a deep look."
+  - glob: "**/{user,users,profile,identity,pii}/**"
+    family: user-data
+    added: 2026-09-03
+    reason: "Family pattern. PROTOCOLS.md §2 also lists content-dependent PII (code handling email / phone / address / dob), which a path matcher cannot see — those still rely on the reviewer."
+  - glob: "**/{migration,migrations}/**"
+    family: migrations
+    added: 2026-09-03
+    reason: "Family pattern. Migrations are irreversible in production in a way application code is not."
+  - glob: "**/webhooks/**"
+    family: webhooks
+    added: 2026-09-03
+    reason: "Family pattern. A webhook endpoint is unauthenticated attack surface by construction — it is reachable by anyone who learns the URL."
+  - glob: "**/oauth*/**"
+    family: webhooks
+    added: 2026-09-03
+    reason: "Family pattern, the OAuth-callback half of the webhooks/external-integrations family."
+  - glob: "**/audit*/**"
+    family: audit
+    added: 2026-09-03
+    reason: "Family pattern. An audit log that can be tampered with or silently dropped is worse than none."
+  - glob: "**/{Dockerfile,Dockerfile.*}"
+    family: infra
+    added: 2026-09-03
+    reason: "Family pattern. The image is the production runtime; a base-image or user change is a security change."
+  - glob: "{terraform,pulumi,infra}/**"
+    family: infra
+    added: 2026-09-03
+    reason: "Family pattern. Infrastructure-as-code changes production directly."
+
+  # --- concrete patterns: code that exists in iris today ---
+  - glob: ".github/workflows/**"
+    family: infra
+    added: 2026-09-03
+    reason: "Exists today (ci.yml, dependency-audit.yml). A workflow change can disable a check, widen a token's permissions, or run untrusted code with repo credentials — IRS-59 added a guard for exactly the permissions half."
+  - glob: "packages/db/drizzle/**"
+    family: migrations
+    added: 2026-09-03
+    reason: "The committed migration SQL (0000_init.sql, 0001_m1_feature_schema.sql) and drizzle/meta snapshots. Applied against production data once and not undone."
+  - glob: "packages/db/src/schema/**"
+    family: user-data
+    added: 2026-09-03
+    reason: "Tenant isolation lives here. ADR-0016 keeps Postgres RLS to dev only, so in production the composite (tenant_id, x) foreign keys in this schema are the enforcement — a change here can silently make cross-tenant reads possible."
+  - glob: "packages/llm/**"
+    family: ai-prompts
+    added: 2026-09-03
+    reason: "Prompt and model-routing code. IRS-59 records that this package has no LLM-security test suite yet and gates on adding one; until it does, a deep read is the only check there is."
+  - glob: "apps/iris-web/app/api/**"
+    family: webhooks
+    added: 2026-09-03
+    reason: "Next.js route handlers — the public HTTP surface of the web app, including anything WhatsApp calls back into."
