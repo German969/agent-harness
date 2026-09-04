@@ -230,32 +230,30 @@
   "hooks": {
     "SessionStart": [
       {
-        "_comment": "Always load: founding docs (the house-style preamble). NOT small, measured: the four founding docs are 99KB / ~25K tokens (PRODUCT.md alone is 46KB), cache-written on every session including the Haiku conversational ones. That predates the vault index below and is a separate scoping question — trimming what a light session needs from PRODUCT.md is its own change. Recorded here so the next reader does not trust the word \"small\". Plus the fleet-memory index — shared/README.md and shared/process/README.md, ~4KB / ~1K tokens of table-of-contents with wikilinks, NOT the notes themselves (harness-behavior.md alone is 9KB). Always-on because a vault nobody is told about is not memory: `shared/**` has been on this agent's git_commit paths since the tier was added and no config mentioned it, so the write path was open and the read path did not exist. Follow a wikilink and Read the one note you need — the state repo is already in the session's additionalDirectories. PROTOCOLS.md \u00a78 (Fleet Memory Protocol) says when to read and where a lesson belongs.",
+        "_comment": "Always load, and DELIBERATELY SMALL — measured, after the founding docs were found to be 99KB / ~25K tokens cache-written on every session including the Haiku conversational ones. STACK.md (10KB) stays because it answers the tech questions a bare mention actually asks. PRODUCT.md, COMPLIANCE.md and BRAND.md moved to the work-skill hook below: a one-line answer should not pay ~22K tokens for product scope it will not use, and the load header gives every skipped file's on-disk path so a session that DOES need one reads it on demand — the same rule this fleet already applied to SYSTEM.md and the ADR index. Plus the fleet-memory index (shared/README.md + shared/process/README.md, ~4KB of table-of-contents with wikilinks, NOT the notes themselves). Always-on because a vault nobody is told about is not memory. PROTOCOLS.md \u00a78 says when to read it and where a lesson belongs.",
         "command": "load",
         "paths": [
-          "<target-project>/founding/PRODUCT.md",
-          "<target-project>/founding/BRAND.md",
           "<target-project>/founding/STACK.md",
-          "<target-project>/founding/COMPLIANCE.md",
           "dev-team-state/shared/README.md",
           "dev-team-state/shared/process/README.md"
         ],
-        "missing": "warn",
-        "missingException": {
-          "<target-project>/founding/COMPLIANCE.md": "ignore"
-        }
+        "missing": "warn"
       },
       {
-        "_comment": "Heavy context — SYSTEM.md + ADR index (Platform writes both — needs them to maintain consistency) + dependency-graph (architect's primary context) — loaded ONLY for the artifact/decision skills that use it. The lightweight `conversational` default skill (bare Q&A / lookups / routing) skips this so a one-line answer doesn't pay to cache-write tens-of-K tokens every session; it reads a specific ADR/SYSTEM.md section on demand instead. See load-hook `only_skills`.",
+        "_comment": "Heavy context — SYSTEM.md + ADR index (Platform writes both — needs them to maintain consistency) + dependency-graph (architect's primary context) — loaded ONLY for the artifact/decision skills that use it. The lightweight `conversational` default skill (bare Q&A / lookups / routing) skips this so a one-line answer doesn't pay to cache-write tens-of-K tokens every session; it reads a specific ADR/SYSTEM.md section on demand instead. See load-hook `only_skills`. Now also carries the founding docs that used to load on EVERY session: PRODUCT.md (46KB, of which the decisions log alone is 18KB), COMPLIANCE.md and BRAND.md. Work sessions pay exactly what they paid before — the tokens moved tier, they did not appear.",
         "command": "load",
         "only_skills": ["system-design", "architect", "devops", "release-manager", "finops", "incident-response"],
         "paths": [
+          "<target-project>/founding/PRODUCT.md",
+          "<target-project>/founding/BRAND.md",
+          "<target-project>/founding/COMPLIANCE.md",
           "<target-project>/docs/architecture/SYSTEM.md",
           "dev-team-state/projects/${PROJECT}/platform/adr-index.md",
           "dev-team-state/projects/${PROJECT}/platform/dependency-graph.md"
         ],
         "missing": "warn",
         "missingException": {
+          "<target-project>/founding/COMPLIANCE.md": "ignore",
           "<target-project>/docs/architecture/SYSTEM.md": "ignore_pre_phase_3",
           "dev-team-state/projects/${PROJECT}/platform/adr-index.md": "ignore_pre_phase_3",
           "dev-team-state/projects/${PROJECT}/platform/dependency-graph.md": "ignore_first_session"

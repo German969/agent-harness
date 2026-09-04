@@ -43,7 +43,10 @@ function ctxFor(skill: string): SessionContext {
     trigger: { kind: 'webhook:github' as const },
     env: {},
     devTeamRoot,
-    targetProjectRoot: join(devTeamRoot, '..', 'chatbots'),
+    // Unused by this hook (it loads only a dev-team path) and deliberately not
+    // pointed at a sibling checkout: CI has only this repo, so a test that reads
+    // one passes locally and fails there — which is exactly how #50 broke.
+    targetProjectRoot: join(devTeamRoot, 'no-target-project-in-this-test'),
     projectName: 'iris',
     db: undefined as never,
     log,
