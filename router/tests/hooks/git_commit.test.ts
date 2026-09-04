@@ -10,7 +10,10 @@ import {
   isRepoWritable,
   resolveRepoPath,
 } from '../../src/hooks/commands/git_commit.js';
-import { gitCommitIfChangedHandler } from '../../src/hooks/commands/git_commit_if_changed.js';
+import {
+  computeLabels,
+  gitCommitIfChangedHandler,
+} from '../../src/hooks/commands/git_commit_if_changed.js';
 import { MemoryAlertPoster } from '../../src/observability/alerts.js';
 import { mkCtx } from './_rig.js';
 
@@ -317,13 +320,14 @@ describe('isRepoWritable', () => {
 });
 
 describe('git_commit_if_changed', () => {
-  it('commits + returns PR intent when create_pr: true', async () => {
+  // These two used to assert `data.pr_labels` came back on the result — the "PR
+  // queued" intent that nothing consumed. The handler opens the PR now, so the
+  // result carries pr_number/pr_url or pr_error instead, and the labels are sent
+  // to GitHub rather than returned. The label RULES keep direct coverage below;
+  // the attempt is covered in tests/hooks/create_pr.test.ts.
+  it('commits and attempts the PR when create_pr: true', async () => {
     writeFileSync(join(devTeam, 'x.md'), '# x\n', 'utf-8');
-    const ctx = mkCtx({
-      devTeamRoot: devTeam,
-      sessionId: 88,
-      agent: 'harness',
-    });
+    const ctx = mkCtx({ devTeamRoot: devTeam, sessionId: 88, agent: 'harness' });
     const r = await gitCommitIfChangedHandler(
       {
         command: 'git_commit_if_changed',
@@ -337,35 +341,36 @@ describe('git_commit_if_changed', () => {
     expect(r.kind).toBe('side-effect');
     if (r.kind === 'side-effect') {
       expect(r.data?.create_pr).toBe(true);
-      expect((r.data?.pr_labels as string[]).includes('agent:harness-bot')).toBe(true);
+      // No remote and no token in this rig, so the attempt fails and SAYS so —
+      // which is the point. Silence here was the bug.
+      expect(r.data?.pr_error).toBeDefined();
+      expect(r.summary).toContain('PR NOT opened');
     }
   });
 
-  it('applies conditional label for misbehavior-debugger skill', async () => {
-    writeFileSync(join(devTeam, 'y.md'), '# y\n', 'utf-8');
-    const ctx = mkCtx({
-      devTeamRoot: devTeam,
-      agent: 'harness',
-      skill: 'misbehavior-debugger',
-    });
-    const r = await gitCommitIfChangedHandler(
-      {
-        command: 'git_commit_if_changed',
-        repo: 'dev-team',
-        create_pr: true,
-        pr_labels: ['agent:harness-bot'],
-        auto_apply_conditional_labels: {
-          _misbehavior_debugger: 'urgent',
+  it('computes PR labels, including the conditional skill rule', () => {
+    expect(
+      computeLabels(
+        {
+          pr_labels: ['agent:harness-bot'],
+          auto_apply_conditional_labels: { _misbehavior_debugger: 'urgent' },
         },
-      },
-      ctx,
-    );
-    expect(r.kind).toBe('side-effect');
-    if (r.kind === 'side-effect') {
-      const labels = r.data?.pr_labels as string[];
-      expect(labels).toContain('agent:harness-bot');
-      expect(labels).toContain('urgent');
-    }
+        { skill: 'misbehavior-debugger' },
+      ),
+    ).toEqual(['agent:harness-bot', 'urgent']);
+
+    // `pr_label` (singular) is the spelling three agents use; dropping it is how
+    // an `agent:<name>` owner label goes missing and the classifier stops routing
+    // that PR's events back to its owner.
+    expect(computeLabels({ pr_label: 'agent:marketer-bot' }, {})).toEqual(['agent:marketer-bot']);
+
+    // The rule must not fire for another skill.
+    expect(
+      computeLabels(
+        { pr_labels: ['a'], auto_apply_conditional_labels: { _misbehavior_debugger: 'urgent' } },
+        { skill: 'qa' },
+      ),
+    ).toEqual(['a']);
   });
 
   it('no-ops when nothing changed', async () => {

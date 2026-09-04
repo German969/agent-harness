@@ -245,6 +245,47 @@ for (const agent of agentSet) {
   }
 }
 
+// 5b — where a `create_pr: true` hook actually points. NOT a failure: two of the
+//      four are inert by DESIGN, and deciding whether to remove them is a call
+//      about each agent's role rather than a config error. Reported because it
+//      was invisible — `create_pr` opened no PR at all until it was wired, and
+//      even now a hook on a repo the router cannot write never reaches the call.
+//
+//      Writability comes from deploy/docker-compose.yml's router mounts:
+//        dev-team                 :ro          (deliberate — Harness commits via
+//                                               the GitHub MCP, see isRepoWritable)
+//        <target-project>         read-write
+//        dev-team-state           read-write
+//        <workspace>              read-write   (the leased worktree)
+//        <target-project>-marketing  NOT MOUNTED — no volume exists
+const PR_CAPABLE_REPOS = new Set(['<target-project>', 'dev-team-state', '<workspace>']);
+const inertPrHooks: string[] = [];
+for (const agent of agents) {
+  let prConfig: ReturnType<typeof loadAgentConfig>;
+  try {
+    prConfig = loadAgentConfig(agent, { devTeamRoot: repoRoot });
+  } catch {
+    continue; // already reported by check 1
+  }
+  for (const entry of (prConfig.settings.hooks?.SessionEnd ?? []) as Array<
+    Record<string, unknown>
+  >) {
+    if (entry.create_pr !== true) continue;
+    const repo = typeof entry.repo === 'string' ? entry.repo : '(no repo)';
+    if (!PR_CAPABLE_REPOS.has(repo)) {
+      inertPrHooks.push(
+        `${agent}: create_pr on repo '${repo}', which the router cannot write — the hook skips before the PR call`,
+      );
+    }
+  }
+}
+if (inertPrHooks.length > 0) {
+  console.warn(
+    `note: ${inertPrHooks.length} create_pr hook(s) target a repo this deployment does not mount writable:`,
+  );
+  for (const entry of inertPrHooks) console.warn(`  - ${entry}`);
+}
+
 // 6 — Guardian's sensitive-paths.yml parses and every entry is well-formed.
 //     Three separate documents route readers here (AGENTS.md's tier table,
 //     PROTOCOLS.md §2, Strategist's curator backstop) and the file did not exist at

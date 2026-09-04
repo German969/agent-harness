@@ -32,7 +32,15 @@ export function resolveAddPaths(
 ): string[] {
   const list = Array.isArray(rawPaths) ? (rawPaths as string[]) : ['.'];
   return list
-    .map((p) => resolveVars(p, vars).replace(/\/\*{1,2}$/, ''))
+    .map((p) => {
+      const resolved = resolveVars(p, vars);
+      // A bare `**` means the whole repo. The trailing-glob strip below needs a
+      // leading slash, so `**` survived it intact, then failed existsSync and was
+      // DROPPED — meaning `paths: ["**"]`, which Marketer and Harness both use,
+      // staged nothing and the hook reported "no matching paths" every session.
+      if (resolved === '*' || resolved === '**' || resolved === './**') return '.';
+      return resolved.replace(/\/\*{1,2}$/, '');
+    })
     .filter((p) => existsSync(join(repoPath, p)));
 }
 

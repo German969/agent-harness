@@ -1,17 +1,23 @@
 // SessionEnd hook — command: 'git_commit_if_changed' with optional `create_pr: true`
 //
 // - Stages + commits the requested paths (like `git_commit`).
-// - If `create_pr: true`: pushes the branch + opens a PR via the GitHub MCP layer.
-//   The actual PR-open call is wired at Phase 6d (SDK-invocation orchestrator);
-//   Phase 6b returns the intent as `side-effect` data for the caller to act on.
+// - If `create_pr: true`: pushes the branch and OPENS the PR.
 //
-// Marketer, Guardian, and Harness all use this — Harness's PR-only enforcement
-// depends on `create_pr: true` being forced (its SessionEnd config sets it).
+// That last part used to be a promise. The handler returned the PR intent as
+// side-effect data, deferring the call to "Phase 6d's SessionEnd runner", and
+// nothing anywhere consumed it — four agents carry the flag and none has ever
+// opened a PR. It now opens one, over the REST API, with the App installation
+// token the session already holds.
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import {
+  type OpenPullRequestResult,
+  PullRequestClient,
+  parseGithubRemote,
+} from '../../github/pullRequest.js';
 import { contextVars, resolveVars } from '../placeholder.js';
-import type { HookHandler, HookResult } from '../types.js';
+import type { HookHandler, HookResult, SessionContext } from '../types.js';
 import {
   type PushResult,
   gitEnvFor,
@@ -38,7 +44,12 @@ type GitCommitIfChangedConfig = {
   push?: boolean;
   create_pr?: boolean;
   pr_template?: string;
+  /** Labels applied to the opened PR. `pr_label` (a single string) is the older
+   *  spelling three agents still use; both are read so neither is silently
+   *  dropped — an `agent:<name>` owner label going missing is what makes the
+   *  GitHub classifier stop routing that PR's events to its owner. */
   pr_labels?: string[];
+  pr_label?: string;
   pr_body_template?: string;
   auto_apply_conditional_labels?: Record<string, string>;
 };
@@ -96,21 +107,26 @@ export const gitCommitIfChangedHandler: HookHandler = async (config, ctx): Promi
     }
 
     if (cfg.create_pr === true) {
-      // The PR-open call needs GitHub MCP + branch push — that lands in Phase 6d.
-      // For Phase 6b we return the PR intent as side-effect data so downstream
-      // orchestration (Phase 6d's SessionEnd runner) can dispatch to the GitHub MCP.
-      const labels = computeLabels(cfg, ctx);
+      // A PR needs a head ref on the remote. `push` is a separate option and three
+      // of the four create_pr configs do not set it, so the PR path pushes on its
+      // own behalf rather than opening a PR against a branch that is not there.
+      if (!push) push = await pushToOrigin(repoPath, gitEnv, ctx.log);
+
+      const pr = await openPr(repoPath, message, cfg, ctx);
+      const suffix = pr.ok
+        ? ` — PR #${pr.result.number}${pr.result.reused ? ' (already open)' : ''} ${pr.result.url}`
+        : ` — PR NOT opened: ${pr.reason}`;
       return {
         kind: 'side-effect',
-        summary: `git_commit_if_changed: committed to ${cfg.repo}${push ? ` (push: ${push})` : ''}; PR queued`,
+        summary: `git_commit_if_changed: committed to ${cfg.repo}${push ? ` (push: ${push})` : ''}${suffix}`,
         data: {
           repo: cfg.repo,
           message,
           ...(push ? { push } : {}),
           create_pr: true,
-          pr_template: cfg.pr_template,
-          pr_labels: labels,
-          pr_body_template: cfg.pr_body_template,
+          ...(pr.ok
+            ? { pr_number: pr.result.number, pr_url: pr.result.url, pr_reused: pr.result.reused }
+            : { pr_error: pr.reason }),
         },
       };
     }
@@ -139,11 +155,15 @@ export const gitCommitIfChangedHandler: HookHandler = async (config, ctx): Promi
  * Phase 6b implements the skill-based auto-label; path-based conditions land in
  * Phase 6d when we have access to the actual diff.
  */
-function computeLabels(
-  cfg: { pr_labels?: string[]; auto_apply_conditional_labels?: Record<string, string> },
+export function computeLabels(
+  cfg: {
+    pr_labels?: string[];
+    pr_label?: string;
+    auto_apply_conditional_labels?: Record<string, string>;
+  },
   ctx: { skill?: string | undefined },
 ): string[] {
-  const labels = new Set(cfg.pr_labels ?? []);
+  const labels = new Set([...(cfg.pr_labels ?? []), ...(cfg.pr_label ? [cfg.pr_label] : [])]);
   const rules = cfg.auto_apply_conditional_labels ?? {};
 
   if (ctx.skill === 'misbehavior-debugger' && rules._misbehavior_debugger) {
@@ -151,4 +171,130 @@ function computeLabels(
   }
 
   return [...labels];
+}
+
+type PrOutcome = { ok: true; result: OpenPullRequestResult } | { ok: false; reason: string };
+
+/**
+ * Open the PR for the commit just made. Never throws: the commit and the push
+ * have already landed, so a PR that cannot be opened is a warning plus an alert,
+ * not a failed session — the same posture `git_commit` takes on a failed push.
+ *
+ * It is an ALERT rather than a log line because a draft that commits and never
+ * surfaces looks exactly like a session that had nothing to say.
+ */
+async function openPr(
+  repoPath: string,
+  message: string,
+  cfg: GitCommitIfChangedConfig,
+  ctx: SessionContext,
+): Promise<PrOutcome> {
+  const token = ctx.env.GITHUB_APP_INSTALLATION_TOKEN;
+  if (!token) {
+    return await failPr('no GITHUB_APP_INSTALLATION_TOKEN in the session env', cfg, ctx);
+  }
+
+  let owner: string;
+  let repo: string;
+  let head: string;
+  let base: string;
+  try {
+    // Branch first: "is there anything to open a PR FROM" is prior to "where would
+    // it go", and it keeps the message specific when a session has committed
+    // straight to the default branch — which is a different problem entirely.
+    head = (
+      await execFileP('git', ['-C', repoPath, 'rev-parse', '--abbrev-ref', 'HEAD'])
+    ).stdout.trim();
+    base = await defaultBranch(repoPath);
+    if (head === base) {
+      return await failPr(
+        `HEAD is the default branch (${base}); nothing to open a PR from`,
+        cfg,
+        ctx,
+      );
+    }
+
+    const remote = (
+      await execFileP('git', ['-C', repoPath, 'remote', 'get-url', 'origin'])
+    ).stdout.trim();
+    const parsed = parseGithubRemote(remote);
+    if (!parsed) return await failPr(`origin is not a GitHub remote (${remote})`, cfg, ctx);
+    owner = parsed.owner;
+    repo = parsed.repo;
+  } catch (err) {
+    return await failPr(`could not read the repo's git refs: ${(err as Error).message}`, cfg, ctx);
+  }
+
+  const labels = computeLabels(cfg, ctx);
+  const body = cfg.pr_body_template
+    ? resolveVars(cfg.pr_body_template, contextVars(ctx))
+    : undefined;
+
+  try {
+    const result = await PullRequestClient.fromToken(token).open({
+      owner,
+      repo,
+      head,
+      base,
+      title: message.split('\n')[0] ?? message,
+      body,
+      labels,
+    });
+    if (result.labelError) {
+      ctx.log.warn(
+        { repo: cfg.repo, pr: result.number },
+        `git_commit_if_changed: ${result.labelError}`,
+      );
+    }
+    ctx.log.info(
+      { repo: cfg.repo, pr: result.number, url: result.url, reused: result.reused },
+      'git_commit_if_changed: pull request open',
+    );
+    return { ok: true, result };
+  } catch (err) {
+    return await failPr((err as Error).message, cfg, ctx);
+  }
+}
+
+/** The default branch, from origin/HEAD; `main` when the ref is not set. */
+async function defaultBranch(repoPath: string): Promise<string> {
+  try {
+    const { stdout } = await execFileP('git', [
+      '-C',
+      repoPath,
+      'symbolic-ref',
+      '--short',
+      'refs/remotes/origin/HEAD',
+    ]);
+    const ref = stdout.trim();
+    return ref.startsWith('origin/') ? ref.slice('origin/'.length) : ref || 'main';
+  } catch {
+    return 'main';
+  }
+}
+
+async function failPr(
+  reason: string,
+  cfg: GitCommitIfChangedConfig,
+  ctx: SessionContext,
+): Promise<PrOutcome> {
+  ctx.log.warn({ repo: cfg.repo, reason }, 'git_commit_if_changed: could not open the PR');
+  if (ctx.alertPoster) {
+    try {
+      const what = `Committed to ${cfg.repo} but could not open the pull request.`;
+      const why = 'The commit is on a branch nobody is looking at';
+      const fix = `until someone opens the PR by hand — ${reason}.`;
+      await ctx.alertPoster.post({
+        agent: ctx.agent,
+        channel: '#agents-alerts',
+        level: 'error',
+        title: 'pr_open_failed',
+        body: `${what} ${why} ${fix}`,
+        fields: { repo: cfg.repo, sessionId: ctx.sessionId },
+      });
+    } catch (err) {
+      ctx.log.warn({ err: (err as Error).message }, 'git_commit_if_changed: alert failed');
+    }
+  }
+  return { ok: false, reason };
 }
