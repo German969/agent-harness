@@ -301,7 +301,7 @@ Before exiting:
 
 ### Special case: incidents
 
-If a session terminates mid-incident, this is **page-the-human territory**, not "just write a marker and let Cyrus retry on the next webhook." Incidents move too fast for async resumption. The incident-response skill should detect approaching termination and page **before** exiting, transferring context to the on-call human.
+If a session terminates mid-incident, this is **page-the-human territory**, not "just write a marker and let the router retry on the next webhook." Incidents move too fast for async resumption. The incident-response skill should detect approaching termination and page **before** exiting, transferring context to the on-call human.
 
 ---
 

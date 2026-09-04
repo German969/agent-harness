@@ -14,7 +14,7 @@
   "max_turns": 40,
 
   "costCap": {
-    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Platform spans cheap work (cost reports, status) and expensive work (system-design — multi-session, big context). The per-job cap is set higher to accommodate system-design sessions. Incident-response is never throttled by off-hours. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
+    "_comment": "The router's pre-launch check enforces the cost fields (per agent, fleet-wide — the ledger has no project dimension). Platform spans cheap work (cost reports, status) and expensive work (system-design — multi-session, big context). The per-job cap is set higher to accommodate system-design sessions. Off-hours throttling is not implemented (offHoursThrottling parses but nothing reads it), so no skill — incident-response included — is ever paused by hour. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
     "perJobCostUsd": 6.00,
     "perJobTokens": 600000,
     "monthlyCostUsd": 80.00,

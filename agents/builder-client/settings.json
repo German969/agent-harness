@@ -12,7 +12,7 @@
   },
   "max_turns": 150,
   "costCap": {
-    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Builder-Client does heavy code work + visual verification (Claude Preview MCP calls add some token cost). Comparable budget to Builder-Server. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
+    "_comment": "The router's pre-launch check enforces the cost fields (per agent, fleet-wide — the ledger has no project dimension). Builder-Client does heavy code work + visual verification (Claude Preview MCP calls add some token cost). Comparable budget to Builder-Server. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
     "perJobCostUsd": 8.0,
     "perJobTokens": 800000,
     "monthlyCostUsd": 150.0,

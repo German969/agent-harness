@@ -12,7 +12,7 @@
   },
   "max_turns": 150,
   "costCap": {
-    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Builder-Server does heavy code work — extended thinking adds ~50% to typical session cost; PR-feedback iterations stack up over a single PR. Per-job ceiling is set high to accommodate complex implementation sessions. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
+    "_comment": "The router's pre-launch check enforces the cost fields (per agent, fleet-wide — the ledger has no project dimension). Builder-Server does heavy code work — extended thinking adds ~50% to typical session cost; PR-feedback iterations stack up over a single PR. Per-job ceiling is set high to accommodate complex implementation sessions. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
     "perJobCostUsd": 8.0,
     "perJobTokens": 800000,
     "monthlyCostUsd": 150.0,

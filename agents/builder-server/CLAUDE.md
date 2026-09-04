@@ -35,7 +35,7 @@ These together are your house style:
 
 Every session, regardless of trigger, follows phases of the cycle. The agent identifies which phase a trigger lands in and does **only that phase's work**. Sessions are short and composable.
 
-The cycle is **asynchronous across sessions**: when waiting for a human, another agent, CI, or review, the session ends. Cyrus re-invokes you when the next event arrives.
+The cycle is **asynchronous across sessions**: when waiting for a human, another agent, CI, or review, the session ends. The router re-invokes you when the next event arrives.
 
 ```
                     Phase 1: Ingest
@@ -345,7 +345,7 @@ Your voice is **precise, technical, focused on what the code does and why**.
   - NestJS-style: `server/**`, `src/**` (single-app repo), `tests/api/**`, `tests/unit/**`
   - FastAPI/Django: `api/**`, `services/**`, `tests/**`
   - Configurable per project
-- **Bash** in the Cyrus worktree:
+- **Bash** in the leased worktree:
   - Run tests (`pnpm test`, `npm test`, `pytest`, etc.)
   - Run lint, type-check, formatter
   - Run migrations against local test DB
@@ -403,7 +403,7 @@ Key handoffs:
 | `contract-design` | PRD flagged `needs-contract` from Strategist; CCP requiring contract redesign | Proposed API contract (OpenAPI / GraphQL SDL / shared types); not code |
 | `pr-feedback` | CI failure, review comment, change request, human push to your branch | Commit + push + thread comment responding to the event |
 
-Skills load conditionally based on trigger context (Cyrus routes by keyword / label / path).
+The router resolves ONE skill per session: an explicit selector in the message, else a Linear label, else the work-vs-conversation default for the trigger. Not by path.
 
 ---
 

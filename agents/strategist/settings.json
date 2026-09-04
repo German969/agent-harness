@@ -14,7 +14,7 @@
   "max_turns": 40,
 
   "costCap": {
-    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Strategist is mostly text generation (PRDs, research, analysis) — lighter than the Builders. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol for the full schema.",
+    "_comment": "The router's pre-launch check enforces the cost fields (per agent, fleet-wide — the ledger has no project dimension). Strategist is mostly text generation (PRDs, research, analysis) — lighter than the Builders. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol for the full schema.",
     "perJobCostUsd": 3.0,
     "perJobTokens": 400000,
     "monthlyCostUsd": 60.0,
@@ -251,7 +251,7 @@
     "model": "Sonnet with extended thinking — strong reasoning without Opus cost. Synthesis and structuring is the agent's primary value; extended thinking pays for itself.",
     "max_turns": "40 covers most multi-turn discussions (founding sessions, complex PRDs); cap protects against runaway loops.",
     "hooks": "SessionStart loads house style from target project; SessionEnd commits state. PreToolUse hooks enforce blast radius technically, not just by prompt.",
-    "writeScope_notation": "<target-project> and ${PROJECT} are resolved by Cyrus from the webhook context. The .dev-team.yml in the target project specifies the exact paths.",
+    "writeScope_notation": "<target-project> and ${PROJECT} are resolved by the router from the webhook context. The .dev-team.yml in the target project specifies the exact paths.",
     "mcp_servers_required": ["linear", "github", "slack", "analytics (read-only)"],
     "future_additions": [
       "An mcp__claude_design connector if Anthropic ships one — currently Claude Design is human-driven, so design-prefill skill outputs paste-ready prompts",

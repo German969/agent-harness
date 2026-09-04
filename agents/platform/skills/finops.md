@@ -23,7 +23,7 @@ description: Cost monitoring across all spend — cloud infra, third-party SaaS/
   - **The agent fleet's own Anthropic API bill** — FinOps watches the watchers
 - **Baseline + anomaly detection**: what's normal spend, what's a spike worth flagging.
 - **Cost attribution**: which feature / service / agent is driving spend.
-- **The agent fleet's per-persona spend caps** (defined in Cyrus config) — track utilization; alert as agents approach their caps.
+- **The agent fleet's per-persona spend caps** (defined in the router config) — track utilization; alert as agents approach their caps.
 - **Savings levers**: rightsizing, reserved capacity, model routing (cheaper models where quality allows), cache utilization, retry-policy tightening.
 
 ## Procedure (scheduled — daily quick check)

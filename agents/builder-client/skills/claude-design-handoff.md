@@ -7,7 +7,7 @@ description: Consume a Claude Design handoff bundle (exported from claude.ai/des
 
 ## Activate when
 
-- Linear ticket has a **Claude Design handoff bundle attached** (detected by file extension or content marker — Cyrus's webhook parser identifies it)
+- Linear ticket has a **Claude Design handoff bundle attached** (you detect it by reading the ticket — the router does not parse Linear attachments)
 - Phase 2 of the dev cycle detects the bundle and routes to this skill before/instead of generating a pre-fill
 
 ## Specialized knowledge

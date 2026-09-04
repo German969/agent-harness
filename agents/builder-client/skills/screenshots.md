@@ -64,7 +64,7 @@ This skill is the **producer side** of the [Product Screenshot Protocol](../../P
 ## Procedure (mobile-native screenshots)
 
 1. **For web mobile viewport** (responsive at 375x812): handle normally via Claude Preview MCP.
-2. **For native iOS / Android screenshots**: Cyrus's Linux VM can't build iOS; Android requires the SDK. **Don't try.** Produce a creative brief instead — point at simulator/device capture, specify the exact states + data + breakpoints, hand to a human (or to CI if CI has iOS/Android build jobs that can capture).
+2. **For native iOS / Android screenshots**: The router host (Linux) can't build iOS; Android requires the SDK. **Don't try.** Produce a creative brief instead — point at simulator/device capture, specify the exact states + data + breakpoints, hand to a human (or to CI if CI has iOS/Android build jobs that can capture).
 
 ## Output format (notification to Marketer)
 

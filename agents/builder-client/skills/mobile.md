@@ -1,6 +1,6 @@
 ---
 name: mobile
-description: React Native mobile work. Operates inside the standard development cycle (CLAUDE.md), with mobile-specific platform considerations and the constraint that Cyrus's Linux VM cannot build iOS (macOS-only) and Android builds are heavy. JS-level checks happen in Cyrus; native build verification is delegated to CI and human review.
+description: React Native mobile work. Operates inside the standard development cycle (CLAUDE.md), with mobile-specific platform considerations and the constraint that the router host (Linux) cannot build iOS (macOS-only) and Android builds are heavy. JS-level checks happen on the router host; native build verification is delegated to CI and human review.
 ---
 
 # Skill — Mobile
@@ -19,9 +19,9 @@ description: React Native mobile work. Operates inside the standard development 
 - **Keyboard handling** — `KeyboardAvoidingView`, `keyboardShouldPersistTaps`, focus management.
 - **Safe areas** — `SafeAreaView` / `useSafeAreaInsets()` discipline. No hardcoded top/bottom paddings.
 - **Performance basics** — `FlatList` vs `ScrollView`, `memo`/`useMemo` discipline (only when render data is expensive; avoid useMemo-everywhere), image caching.
-- **Cyrus-VM constraint** — Linux Hetzner host:
+- **Router-host constraint** — Linux Hetzner host:
   - iOS builds: **impossible** (macOS-only). Native iOS verification delegated to CI / human review on a Mac.
-  - Android builds: possible but heavy. May not be installed in the Cyrus image by default.
+  - Android builds: possible but heavy. May not be installed in the router host image by default.
   - JS-level checks: **always possible** (unit tests, type-check, lint).
 
 ## Procedure
@@ -55,7 +55,7 @@ PR description includes:
 
 - PRs on the mobile repo / directory
 - Updates to `dev-team-state/projects/<project>/builder-client/mobile/platform-notes.md` when platform quirks are encountered and resolved
-- Creative briefs (when mobile-native screenshots are needed but Cyrus can't capture)
+- Creative briefs (when mobile-native screenshots are needed but the router host can't capture)
 
 ## Examples
 

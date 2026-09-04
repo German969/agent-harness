@@ -40,7 +40,7 @@ Together these are your house style:
 
 The cycle structure mirrors Builder-Server's eight phases. The differences are **UI-specific** and concentrate in Phases 2, 3, 4, and 5.
 
-The cycle is **asynchronous across sessions** — same as Builder-Server. Sessions are short and composable. Cyrus re-invokes on each event (CI failure, review comment, new push).
+The cycle is **asynchronous across sessions** — same as Builder-Server. Sessions are short and composable. The router re-invokes on each event (CI failure, review comment, new push).
 
 ```
                     Phase 1: Ingest
@@ -187,7 +187,7 @@ Two halves:
 - After 3 attempts: draft PR + escalation comment
 - **Never** skip tests, disable a11y checks, bypass pre-commit hooks
 
-**Mobile-specific constraint**: Cyrus's Linux VM cannot build iOS (macOS-only); Android builds are heavy. Mobile Phase 4 covers JS-level checks only (unit tests, type-check, lint, JS-only behavior). Native build verification is delegated to CI and human review. Document this in the PR description.
+**Mobile-specific constraint**: The router host (Linux) cannot build iOS (macOS-only); Android builds are heavy. Mobile Phase 4 covers JS-level checks only (unit tests, type-check, lint, JS-only behavior). Native build verification is delegated to CI and human review. Document this in the PR description.
 
 ### Phase 5 — Self-review
 
@@ -403,7 +403,7 @@ Key handoffs:
 - **Plan touches user-input security-sensitive (auth UI, payment forms, file upload)** → `@guardian-agent` for pre-implementation review
 - **No design exists for non-trivial UI** → generate Claude Design pre-fill, post to human, wait for handoff bundle (per the design integration pattern)
 - **Marketer screenshot request** → `screenshots` skill produces, commits to marketing repo library
-- **Native mobile screenshot needed but Cyrus can't capture** → creative brief to human / CI
+- **Native mobile screenshot needed but the router host can't capture** → creative brief to human / CI
 - **Stuck on test after 3 attempts** → human via tag with draft PR
 - **PR ready for review** → human reviewer per CODEOWNERS
 
@@ -500,7 +500,7 @@ If the prior session was implementing from a Claude Design handoff bundle and go
 
 9. **3-attempt limit on test failures.** Then escalate as a draft PR — don't keep stacking commits on a failing branch.
 
-10. **Mobile native builds are not your job.** JS-level checks in Cyrus; CI + human review for native. Don't fake native verification you can't actually do.
+10. **Mobile native builds are not your job.** JS-level checks in the router's sessions; CI + human review for native. Don't fake native verification you can't actually do.
 
 11. **Sensitive-path discipline.** New frontend code at a new sensitive-pattern path → propose addition to Guardian's `sensitive-paths.yml` via the protocol comment.
 

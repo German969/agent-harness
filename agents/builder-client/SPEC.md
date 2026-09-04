@@ -37,7 +37,7 @@ Visual production itself — mockups, prototypes — is **not** an absorbed role
 
 The cycle structure mirrors Builder-Server's eight phases. The differences are UI-specific and concentrate in Phases 2, 3, 4, and 5. Where a phase matches Builder-Server's, this spec is brief; where it diverges, it goes deeper.
 
-The cycle is **asynchronous across sessions** — same as Builder-Server. Sessions are short and composable. Cyrus re-invokes on each event (CI failure, review comment, new push).
+The cycle is **asynchronous across sessions** — same as Builder-Server. Sessions are short and composable. The router re-invokes on each event (CI failure, review comment, new push).
 
 ```
                     Phase 1: Ingest
@@ -196,7 +196,7 @@ Builder-Client's Phase 4 has two halves: automated tests, then visual verificati
 - After 3 attempts on a failing automated test: draft PR + escalation comment (same rules as Builder-Server).
 - No skipping tests, no disabling a11y checks, no bypassing pre-commit hooks.
 
-**Mobile-specific note:** Cyrus's Linux VM cannot build iOS (macOS-only) and Android builds are heavy (Android SDK install). Mobile Phase 4 covers JS-level checks: unit tests, type-check, lint, JS-only behavior. Native build verification is delegated to CI/human review. The mobile skill documents this constraint explicitly in PR descriptions ("JS verified locally; native builds will run in CI").
+**Mobile-specific note:** The router host (Linux) cannot build iOS (macOS-only) and Android builds are heavy (Android SDK install). Mobile Phase 4 covers JS-level checks: unit tests, type-check, lint, JS-only behavior. Native build verification is delegated to CI/human review. The mobile skill documents this constraint explicitly in PR descriptions ("JS verified locally; native builds will run in CI").
 
 ### Phase 5 — Self-review
 
@@ -344,7 +344,7 @@ Full development cycle (§4) applies. This skill provides knowledge used during 
 - **Keyboard handling** — `KeyboardAvoidingView`, `keyboardShouldPersistTaps`, focus management.
 - **Safe areas** — `SafeAreaView` / `useSafeAreaInsets()` discipline. No hard-coded top/bottom paddings.
 - **Performance basics** — `FlatList` vs `ScrollView`, `memo`/`useMemo` discipline, image caching.
-- **Cyrus-VM constraint** — Cyrus runs on Linux Hetzner. iOS builds are impossible there (macOS-only); Android builds are possible but heavy and may not be installed by default. JS-level checks are always possible. **Native build verification is delegated to CI and human review.**
+- **Router-host constraint** — the router runs on a Linux Hetzner VPS. iOS builds are impossible there (macOS-only); Android builds are possible but heavy and may not be installed by default. JS-level checks are always possible. **Native build verification is delegated to CI and human review.**
 
 **Procedure**
 Full cycle (§4). Additions specific to this skill:
@@ -467,7 +467,7 @@ Full cycle (§4). Additions specific to this skill:
 5. Post the prompt back as a Linear/Slack comment, wrapped in a fenced code block, with instructions:
    > Open [claude.ai/design](https://claude.ai/design), paste this prompt, iterate on the canvas. When done, click **Export** to generate a handoff bundle, then paste the bundle into this ticket and reassign to `@client-agent`.
 6. Archive the prompt to `state/<project>/builder-client/design-prefills/<slug>.md` for future reuse / pattern detection.
-7. End the session. Cyrus re-invokes when the human responds with a handoff bundle.
+7. End the session. The router re-invokes when the human responds with a handoff bundle.
 
 **Outputs**
 - Linear/Slack comment with the paste-ready prompt
@@ -488,7 +488,7 @@ Full cycle (§4). Additions specific to this skill:
 ### 5.5 `claude-design-handoff` — Consume a Claude Design Handoff Bundle
 
 **Triggers**
-- Linear ticket has a Claude Design handoff bundle attached (the bundle is detected by file extension or content marker — Cyrus's webhook parser identifies it).
+- Linear ticket has a Claude Design handoff bundle attached (you detect it by reading the ticket — the router does not parse Linear attachments).
 - Phase 2 of the cycle detects the bundle and routes to this skill before/instead of generating a pre-fill.
 
 **Specialized knowledge this skill provides**
@@ -621,7 +621,7 @@ This skill is the **producer side** of the [Product Screenshot Protocol](../PROT
 **Procedure (mobile-native screenshots)**
 
 1. For web mobile viewport (responsive at 375x812): handle normally via Claude Preview MCP.
-2. For native iOS / Android screenshots: Cyrus's Linux VM can't build iOS; Android requires the SDK. **Don't try.** Produce a creative brief instead — point at simulator/device capture, specify the exact states + data + breakpoints, hand to a human (or to CI if CI has iOS/Android build jobs that can capture).
+2. For native iOS / Android screenshots: The router host (Linux) can't build iOS; Android requires the SDK. **Don't try.** Produce a creative brief instead — point at simulator/device capture, specify the exact states + data + breakpoints, hand to a human (or to CI if CI has iOS/Android build jobs that can capture).
 
 **Outputs**
 - Screenshots in `assets/screenshots/library/<surface>/` (general reuse) or `campaign-assets/<slug>/` (campaign-specific)
@@ -671,7 +671,7 @@ dev-team-state/projects/<project>/builder-client/
 ├── design-prefills/                 Archived Claude Design pre-fills (for pattern detection)
 ├── mobile/
 │   ├── platform-notes.md            iOS/Android quirks encountered
-│   └── build-recipes.md             How to build for different envs (mostly for human reviewers, since native build doesn't run in Cyrus)
+│   └── build-recipes.md             How to build for different envs (mostly for human reviewers, since native build doesn't run on the router host)
 └── a11y/
     └── audit-baseline.md            Current a11y state across the app
 ```
@@ -739,7 +739,7 @@ dev-team-state/projects/<project>/builder-client/
 | Plan touches a paid third-party SDK (analytics, embeds) | `@platform-agent` (FinOps skill) | Cost projection requesting sign-off |
 | PR adds frontend code at a new sensitive-pattern path not in Guardian's config | `@guardian-agent` | Sensitive-path candidate comment per the [Sensitive-Paths Protocol](../PROTOCOLS.md#2-sensitive-paths-protocol) |
 | Marketer requests product screenshots | `@marketer-agent` (response) | Captures via `screenshots` skill (§5.7), commits to library, replies with paths per the [Product Screenshot Protocol](../PROTOCOLS.md#4-product-screenshot-protocol) |
-| Native mobile screenshot needed but can't be captured in Cyrus | Human (or CI if it builds iOS/Android) | Creative brief specifying surface / state / data setup / breakpoints |
+| Native mobile screenshot needed but can't be captured on the router host | Human (or CI if it builds iOS/Android) | Creative brief specifying surface / state / data setup / breakpoints |
 | No design exists for non-trivial UI | Human (via Claude Design pre-fill) | Linear/Slack comment with paste-ready Claude Design prompt |
 | Stuck on a test after 3 attempts | Human | Draft PR + comment |
 | PR ready for review | Human reviewer (CODEOWNERS) | Standard review request with screenshots |
@@ -812,13 +812,13 @@ Inherits most of Builder-Server's failure modes; UI-specific additions below.
 |---|---|---|
 | Visual verification doesn't match design | Side-by-side mismatch during Phase 4 | Diagnose: pixel offset, token misuse, missing state. Fix and re-verify. If genuinely ambiguous, post both versions in a PR comment and ask. |
 | Dev server fails to start in worktree | `pnpm dev` exits with error | Diagnose: missing env, port conflict, dependency issue. If env-related, post a comment asking for the missing var. If toolchain, ping `@platform-agent` (DevOps). |
-| Mobile JS tests pass but native CI fails | Visible in PR after push | Don't iterate blindly — flag for human + post the CI logs. Cyrus can't reproduce native locally. |
+| Mobile JS tests pass but native CI fails | Visible in PR after push | Don't iterate blindly — flag for human + post the CI logs. The router host can't reproduce native locally. |
 | a11y check fails on a fix the agent thought was correct | Axe report after fix attempt | Re-read the rule, look up an authoritative source, post the rule + the agent's interpretation in a PR comment, ask reviewer. |
 | Design-system change requires updating many call sites | Plan reveals 50+ files affected | Decompose into multiple PRs: (1) introduce the new token + components, (2)–(N) migrate call sites in chunks. Don't try to ship a giant atomic refactor. |
 | Reviewer requests a visual change the agent can't validate (e.g. "make it pop") | Phase 7 | Ask for specifics: which element, what direction, with a reference if possible. Don't iterate on vibes. |
 | Claude Design handoff bundle is internally inconsistent | Detected during handoff skill parsing | Post a comment with the inconsistencies, ask the human designer to reconcile. Pause until clarified. |
 | Test fails after 3 attempts | Phase 4 retry counter | Draft PR + escalate (same as Builder-Server). |
-| Spend cap reached | Cyrus pre-launch check | Cyrus refuses to start; alert; no agent code change needed. |
+| Spend cap reached | The router's pre-launch check | The router refuses to start; alert; no agent code change needed. |
 
 ## 11. Implementation notes (for CLAUDE.md + skill drafting)
 
@@ -850,7 +850,13 @@ For `agents/builder-client/settings.json`:
   - `PostToolUse` for Edit/Write: run lint + format on changed files.
   - `SessionEnd`: commit state to `dev-team-state`, update `design-system.md` if changed, update `active-prs.md`.
 
-For `cyrus/cyrus.config.json`:
+For the router side (`identities/builder-client.yml` + `router/src/routing/skill.ts`):
+
+> **Design target, not current behaviour.** There is no `cyrus/cyrus.config.json` in this repo. Ingress routing (event → agent) lives in `identities/builder-client.yml`; skill resolution (event → skill) lives in `router/src/routing/skill.ts`, and it picks **exactly one** skill per session — nothing loads a second skill "alongside" another.
+>
+> What resolves today: the selectors `screenshot` → `screenshots`, `a11y` → `a11y`, `prefill` → `claude-design-prefill`; an event on a PR Builder-Client owns → `pr-feedback`; any other work trigger → `frontend`; a bare mention → `conversational`.
+> The `mobile`, `design` and `needs-design` labels route the ticket to Builder-Client but map to no skill, so they land on `frontend`. Nothing detects a handoff bundle — `claude-design-handoff` is reachable only by reading the ticket and switching deliberately.
+
 - Trigger routing:
   - Linear ticket assignment → ingest, default skill = `frontend`
   - Linear label `mobile` → load `mobile` skill alongside `frontend`

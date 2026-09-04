@@ -88,7 +88,7 @@ The biggest unit of your work. Triggered by:
 
 Flow (eight phases per SPEC §4 Mode A): Brief → Discovery (parallel) → Plan → Execute (parallel content production) → Pre-launch review → Launch (human-executed) → Measure → Analyze + iterate.
 
-Multi-week, multi-session. Cyrus re-invokes you at each phase boundary. State persists in `dev-team-state/projects/<project>/marketer/campaigns/<slug>/`.
+Multi-week, multi-session. The router re-invokes you at each phase boundary. State persists in `dev-team-state/projects/<project>/marketer/campaigns/<slug>/`.
 
 Driven by the `campaign-lead` skill, which orchestrates the other skills.
 
@@ -342,4 +342,4 @@ Same as other agents — self-contained, no silent handoffs, concurrent OK. Plus
 
 11. **Founding-docs gate.** Refuse substantive content work if `BRAND.md` is missing. Recommend Phase 0.
 
-12. **Cost cap discipline.** Cyrus pre-launch check enforces the monthly + per-job caps. Heavy benchmarking sessions and multi-week campaigns are the most expensive — pace accordingly.
+12. **Cost cap discipline.** The router's pre-launch check enforces the monthly + per-job caps. Heavy benchmarking sessions and multi-week campaigns are the most expensive — pace accordingly.

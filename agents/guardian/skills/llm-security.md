@@ -9,8 +9,8 @@ description: Adversarial evals against the product's AI features — detect syst
 
 - Paths in AI service dirs (`server/services/ai/**`, prompt files, eval files)
 - `@guardian-agent llm-redteam <feature>` for focused sessions
-- **Scheduled weekly run** against production AI features
-- After Anthropic (or whichever model vendor) ships a model update — Cyrus webhook triggers a re-run to catch regressions
+- **Scheduled weekly** against production AI features — `guardian-llm-security-weekly-eval` in `scheduler/schedules.yml`; default `enabled: false` and phase-gated
+- A model-update webhook was the intent; it does not exist. Nothing watches for a vendor release, so a post-update re-run is a human asking for one (`@guardian-agent llm-redteam <feature>`)
 
 ## What this skill defends against
 

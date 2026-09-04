@@ -105,7 +105,7 @@ Phase 8 — Analyze + iterate
   Posted as a campaign retrospective doc.
 ```
 
-Multi-week, multi-session. Cyrus re-invokes Marketer at each phase boundary. State persists in `dev-team-state/projects/<project>/marketer/campaigns/<slug>/`.
+Multi-week, multi-session. The router re-invokes Marketer at each phase boundary. State persists in `dev-team-state/projects/<project>/marketer/campaigns/<slug>/`.
 
 ### Mode B — Single-asset mode (one piece of content, no campaign)
 
@@ -839,7 +839,7 @@ Within that constraint:
 | Inbound mention escalates into a public crisis | Brand Steward detects tone shift | Stop drafting public responses; alert humans (marketing lead + comms lead); load the crisis-comms playbook |
 | Tempted to publish autonomously to react quickly to a competitor | Self-check against the publishing rule | Stop. Draft only. Human gates exist for a reason; speed isn't worth the autonomous-mistake risk |
 | Tried to scrape login-gated competitor content | Pre-check before fetch | Stop; benchmarking is public-info only; find an alternative source or note "not publicly available" |
-| Spend cap reached | Cyrus pre-launch check / FinOps alert | Cyrus refuses to start; alert; no Marketer code change needed |
+| Spend cap reached | The router's pre-launch check / FinOps alert | The router refuses to start; alert; no Marketer code change needed |
 
 ## 11. Implementation notes (for CLAUDE.md + skill drafting)
 
@@ -874,7 +874,13 @@ For `agents/marketer/settings.json`:
   - `PreToolUse` for content using a customer quote: verify the quote exists in `testimonials/approved.md` with `approved: yes`.
   - `SessionEnd`: commit state changes.
 
-For `cyrus/cyrus.config.json`:
+For the router side (`identities/marketer.yml` + `router/src/routing/skill.ts`):
+
+> **Design target, not current behaviour.** There is no `cyrus/cyrus.config.json` in this repo. Ingress routing (event → agent) lives in `identities/marketer.yml`; skill resolution (event → skill) lives in `router/src/routing/skill.ts`, and it picks **exactly one** skill per session — nothing loads a second skill "alongside" another.
+>
+> What resolves today: the selectors `launch`/`campaign` → `campaign-lead`, `brief` → `creative-brief`, `benchmark` → `benchmarking`; the Linear labels `campaign` → `campaign-lead`, `content` → `content-writer`, `benchmark` → `benchmarking`; any other work trigger → `campaign-lead`; a bare mention → `conversational`. The remaining labels in `identities/marketer.yml` (`social`, `email`, `pr`, `brand`, `growth`, …) route the ticket to Marketer but map to no skill.
+> Cron: the five `marketer-*` entries in `scheduler/schedules.yml` are all `enabled: false`, and the social cadence entries are still commented out. There is no inbound social webhook.
+
 - Trigger routing:
   - Slack/Linear "campaign" / "launch" keywords → Campaign Lead skill
   - Content-type keywords (blog / post / email / press) → matching content skill
@@ -886,7 +892,7 @@ For `cyrus/cyrus.config.json`:
 ## 12. Open questions
 
 1. **Testimonial permission collection process** — who collects permission from customers (Strategist Triage? human Support? human Marketing?), how it's recorded, what form the permission takes (email confirmation? signed release? click-through?). Without a clear answer here, the testimonial library can't function. Decide before launch.
-2. **Marketing toolbelt selection** — CMS, email platform, social scheduler, analytics — needs to be picked in Phase 6 (per [PLAN.md](../../PLAN.md)). The MCP connectors for whichever platforms are chosen need to support draft-creation without publish/send capabilities (or Cyrus enforces the gate technically).
+2. **Marketing toolbelt selection** — CMS, email platform, social scheduler, analytics — needs to be picked in Phase 6 (per [PLAN.md](../../PLAN.md)). The MCP connectors for whichever platforms are chosen need to support draft-creation without publish/send capabilities (or the router's `PreToolUse` hooks enforce the gate technically).
 3. **Brand assets host** — where do logos, hero images, social cards live? `<target-project>/assets/` (git LFS), a CDN bucket, Cloudinary, Figma exports referenced by URL? Determines the execution path in creative briefs.
 4. **Competitor list initial population** — who decides who counts as a competitor? Recommend: Marketer + Strategist + human marketing lead in a Phase 0 / Phase 6 session, then maintained by Marketer's benchmarking skill.
 5. **Negative-comparison marketing policy** — by default, Marketer doesn't do negative comparisons. Some brands explicitly want them. Loaded from `BRAND.md` if defined.

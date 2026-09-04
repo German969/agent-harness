@@ -37,7 +37,7 @@ Promoting any of these would create a new top-level agent (e.g. `@ai-agent`, `@d
 
 This is the heart of Builder-Server. Every session, regardless of trigger, follows a phased cycle. The agent identifies which phase a trigger lands in and does only that phase's work — sessions are short and composable, not monolithic.
 
-The cycle is **asynchronous across sessions**: when waiting for a human, another agent, CI, or review, the session ends. Cyrus re-invokes Builder-Server when the next event arrives.
+The cycle is **asynchronous across sessions**: when waiting for a human, another agent, CI, or review, the session ends. The router re-invokes Builder-Server when the next event arrives.
 
 ```
                     Phase 1: Ingest
@@ -147,7 +147,7 @@ Shorter. 3–5 lines.
 - Whether it's in scope (some review feedback is out of scope and warrants a separate ticket)
 
 **Decision after planning:**
-- **Open questions exist** → post the plan, end the session, wait. Cyrus re-invokes when there's a reply.
+- **Open questions exist** → post the plan, end the session, wait. The router re-invokes when there's a reply.
 - **No open questions** → proceed to Phase 3 in the same session.
 - **Plan reveals the task should be split** (e.g. "this is actually two unrelated changes") → post the split proposal as a plan, end session, wait for human confirmation.
 
@@ -229,7 +229,7 @@ After reacting, loop back to Phase 2 (re-plan if needed) or Phase 4 (re-test) de
 
 ### Phase 8 — Post-merge
 
-When the PR merges, a post-merge Cyrus hook triggers Builder-Server one more time.
+When the PR merges, the router receives `pull_request.closed` and triggers Builder-Server one more time.
 
 - Update the Linear ticket status (gated mutation — requires the slash command `@server-agent mark ENG-1234 done` from a human, or the post-merge hook supplies it automatically).
 - **Announce contract changes** — if the PR changed the API contract and there's a dependent frontend ticket, post the contract **diff** (just what changed, not the whole contract) to Builder-Client's ticket. (In contract-first mode the ticket isn't blocked; this is a "backend live, swap your mocks" signal. In sequential-fallback mode, removing the `blocked-by` marker is the unblock signal.) See the [API Contract Protocol](../PROTOCOLS.md#development-flow--contract-first-default). Flag breaking changes explicitly.
@@ -550,7 +550,7 @@ dev-team-state/projects/<project>/builder-server/
   - NestJS-style: `server/**`, `src/**` (if it's a single-app repo), `tests/api/**`, `tests/unit/**`
   - FastAPI/Django: `api/**`, `services/**`, `tests/**`
   - Generic: anything under a configurable `backend_paths` list
-- **Bash** — full shell access in the Cyrus worktree:
+- **Bash** — full shell access in the leased worktree:
   - Run tests (`pnpm test`, `npm test`, `pytest`, etc.)
   - Run lint and type-check
   - Run formatter
@@ -676,13 +676,13 @@ Builder-Server's voice is **precise, technical, focused on what the code does an
 |---|---|---|
 | Tests fail after 3 fix attempts | Phase 4 retry counter | Draft PR + escalate comment; end session |
 | Plan was wrong, implementation diverging | Mid-Phase 3 self-check | Pause, re-plan (Phase 2), post update, continue |
-| Context overflow on a large task | Approaching token budget | Decompose: open a draft PR with what's done, post a continuation plan, end session, Cyrus re-invokes with smaller scope |
+| Context overflow on a large task | Approaching token budget | Decompose: open a draft PR with what's done, post a continuation plan, end session, the router re-invokes with smaller scope |
 | Linear write rejected (tiered permission) | API call returns 403 | Reply with the slash command the human should run; do not retry the forbidden action |
 | Push rejected (protected branch / forced update on shared branch) | git push fails | Read the rejection, retarget if appropriate; never use `--force-with-lease` to bypass without explicit reason |
 | Merge conflict on rebase | git rebase reports conflict | Resolve conflicts only in agent-authored regions; for conflicts in human-authored regions, push the unresolved state and ask the human |
 | Cross-agent handoff doesn't return | Time-based SLA (configurable per project) | Escalate to a human reviewer with a "still waiting on @X" comment |
 | CI environment issue (not code-related) | Repeated identical failures on infra-level errors | Ping `@platform-agent` (DevOps); do not patch the code in response to infra failures |
-| Spend cap reached | Cyrus pre-launch check fails | Cyrus refuses to start the session; alert posts to `#agents-alerts`; no Builder-Server code change needed |
+| Spend cap reached | The router's pre-launch check fails | The router refuses to start the session; alert posts to `#agents-alerts`; no Builder-Server code change needed |
 | Conflicting reviewer requests | Two reviewers ask for opposite changes | Post a comment asking them to resolve between themselves; don't pick a side |
 
 ## 11. Implementation notes (for CLAUDE.md + skill drafting)
@@ -716,7 +716,12 @@ For `agents/builder-server/settings.json`:
   - `PostToolUse` for Edit/Write: run lint on changed files automatically.
   - `SessionEnd`: commit state changes to `dev-team-state`, update `active-prs.md`.
 
-For `cyrus/cyrus.config.json`:
+For the router side (`identities/builder-server.yml` + `router/src/routing/skill.ts`):
+
+> **Design target, not current behaviour.** There is no `cyrus/cyrus.config.json` in this repo. Ingress routing (event → agent) lives in `identities/builder-server.yml`; skill resolution (event → skill) lives in `router/src/routing/skill.ts`, and it picks **exactly one** skill per session — nothing loads a second skill "alongside" another.
+>
+> What resolves today: the selectors `contract` → `contract-design` and `migration` → `backend` (matched right after the mention); an event on a PR Builder-Server owns → `pr-feedback`; any other work trigger → `backend`; a bare mention → `conversational`.
+> The `ai` and `data-engineer` Linear labels in `identities/builder-server.yml` route the TICKET to Builder-Server but map to no skill in `LABEL_SKILLS`, so they land on `backend`. `ai-specialist` and `data-engineer` are unreachable by label.
 
 - Trigger routing:
   - Linear ticket assignment → ingest, default skill = `backend` unless tag matches
@@ -735,7 +740,7 @@ Spec-specific TBDs:
 
 1. **Merge authority** — Builder-Server cannot merge by default. Should we have a gated-allowed mode where, after CI passes + ≥1 human approval + Guardian "all clear," the agent can self-merge? Lean yes for trivial PRs (docs, dependency bumps); no for substantive code.
 2. **Sonnet vs Sonnet-with-extended-thinking vs Opus split** — current default is Sonnet+thinking. Revisit after 30 days: are there session types where thinking budget is wasted vs where Opus is actually needed? Tune based on observed outcomes.
-3. **Worktree cleanup policy** — Cyrus creates a worktree per job. After PR is merged, when does the worktree get reaped? Default: 7d after merge. Aggressive cleanup risks losing context for follow-up PRs; lax cleanup wastes disk.
+3. **Worktree cleanup policy** — The router creates a worktree per job. After PR is merged, when does the worktree get reaped? Default: 7d after merge. Aggressive cleanup risks losing context for follow-up PRs; lax cleanup wastes disk.
 4. **Concurrent PRs on related code** — if Builder-Server is mid-flight on ENG-1234 touching `payment.service.ts` and a new ticket ENG-1240 also touches `payment.service.ts` is assigned, should the agent wait or proceed in parallel? Default: proceed in parallel, accept the rebase conflict, resolve at PR-update time.
 5. **AI Specialist eval tolerance** — how much eval regression is acceptable? Default: 0 (no regressions allowed). Could be loosened with a per-eval tolerance config.
 6. **Data Engineer dry-run policy** — should every data migration include a dry-run flag and produce dry-run output in the PR? Default: yes when row count >100k.

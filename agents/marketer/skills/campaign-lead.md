@@ -23,7 +23,7 @@ description: Owns the end-to-end campaign lifecycle — brief → discovery → 
 
 ## Procedure
 
-The skill drives the multi-phase workflow. Cyrus re-invokes Marketer at each phase boundary; state persists in `dev-team-state/projects/<project>/marketer/campaigns/<slug>/`.
+The skill drives the multi-phase workflow. The router re-invokes Marketer at each phase boundary; state persists in `dev-team-state/projects/<project>/marketer/campaigns/<slug>/`.
 
 ### Phase 1 — Brief
 

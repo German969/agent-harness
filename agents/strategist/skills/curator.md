@@ -7,9 +7,9 @@ description: Knowledge Curator — keeps documentation accurate. Detects drift b
 
 ## Activate when
 
-- **Scheduled cron** — weekly Friday afternoon
-- Post-merge hook (GitHub Action calls Cyrus webhook) on PRs that touch `docs/`, `CLAUDE.md`, `*.md` in service roots, or `<target-project>/founding/**`
-- Slack: `@strategist-agent curate docs` for explicit invocation
+- **Scheduled** — `strategist-curator-weekly-drift-sweep` in `scheduler/schedules.yml`, Friday afternoon. Default `enabled: false`, so it does not fire until someone enables it.
+- **Slack** — `@strategist-agent curate docs` (the `curate` selector) for explicit invocation. This is the only trigger that works today.
+- ~~Post-merge hook on PRs touching `docs/`, `CLAUDE.md`, `*.md` in service roots, or `<target-project>/founding/**`~~ — **does not exist.** No GitHub Action calls the router, and a merged PR reaches only its own agent (`github_pr_closed`). Drift in those paths is caught by the weekly sweep or by asking.
 - **Includes a Product-Marketing weekly sync pass** per the [Product-Marketing Sync Protocol](../../PROTOCOLS.md#3-product-marketing-sync-protocol)
 
 ## Scope

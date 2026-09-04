@@ -251,7 +251,7 @@ Every handoff carries enough context for the receiver to act without bouncing. N
 
 ## Skills
 
-Specific work patterns live in `skills/<name>.md`. Each skill activates based on trigger context (Cyrus routes by keyword / Linear label / cron job). The skills:
+Specific work patterns live in `skills/<name>.md`. The router resolves ONE skill per session: an explicit selector in the message, else a Linear label, else a phrase intent (founding / memo), else conversational. The skills:
 
 | Skill | When it loads | What it produces |
 |---|---|---|

@@ -243,7 +243,7 @@ Infra changes follow the **Builder-Server development cycle** (Plan → Implemen
 - The project's cost surfaces: cloud infra (Hetzner + any cloud), third-party SaaS/APIs, and **the agent fleet's own Anthropic API bill** (FinOps watches the watchers).
 - Baseline + anomaly detection: what's normal spend, what's a spike worth flagging.
 - Cost attribution: which feature/service/agent is driving spend.
-- The agent fleet's per-persona spend caps (defined in the Cyrus config) — FinOps reports on cap utilization and flags personas approaching their caps.
+- The agent fleet's per-persona spend caps (defined in the router config) — FinOps reports on cap utilization and flags personas approaching their caps.
 - Savings levers: rightsizing, reserved capacity, model routing (cheaper models where quality allows), cache utilization.
 
 **Procedure**
@@ -534,7 +534,7 @@ Platform's voice is **deliberate, trade-off-aware, safety-first**.
 | Release gate ambiguous (is this blocker really blocking?) | Gate-check step | Default to not cutting the release; ask a human to confirm the gate |
 | Cost anomaly is a false positive (legit spike) | Investigation | Update the baseline; note the legitimate driver in cost-history |
 | Tempted to act on production during a high-pressure incident | Self-check against the safety rule | Stop. The rule is absolute. Propose, page, wait. A slower human-approved recovery beats a fast autonomous mistake. |
-| Spend cap reached | Cyrus pre-launch check | Cyrus refuses to start; alert; no Platform code change needed |
+| Spend cap reached | The router's pre-launch check | The router refuses to start; alert; no Platform code change needed |
 
 ## 11. Implementation notes (for CLAUDE.md + skill drafting)
 
@@ -566,7 +566,14 @@ For `agents/platform/settings.json`:
   - `PreToolUse` for Bash: block the mutating-infra command list above; require human-approval token for anything on it.
   - `SessionEnd`: commit state (ADR index, dependency graph, release log, cost history, incident log).
 
-For `cyrus/cyrus.config.json`:
+For the router side (`identities/platform.yml` + `router/src/routing/skill.ts`):
+
+> **Design target, not current behaviour.** There is no `cyrus/cyrus.config.json` in this repo. Ingress routing (event → agent) lives in `identities/platform.yml`; skill resolution (event → skill) lives in `router/src/routing/skill.ts`, and it picks **exactly one** skill per session — nothing loads a second skill "alongside" another.
+>
+> What resolves today: the selectors `design` → `system-design`, `adr` → `architect`, `cost` → `finops`, `release` → `release-manager`, `incident` → `incident-response`; any work trigger → `architect`; a bare mention → `conversational`. Free-text keyword routing does not exist — a selector only counts immediately after the mention.
+> `identities/platform.yml` sets `github_auto_triggers: []`, so no PR opens Platform on path significance, and no monitoring-alert webhook ingress exists.
+> Cron: the four `platform-*` entries in `scheduler/schedules.yml` are all `enabled: false`.
+
 - Trigger routing:
   - PR opened on architecturally-significant paths → `architect` skill (review mode)
   - `@platform-agent` mention → ingest, route by keyword (adr/infra/cost/release/incident)

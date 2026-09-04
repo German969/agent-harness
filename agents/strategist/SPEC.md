@@ -76,7 +76,7 @@ Across all modes: **Strategist proposes mutations to source-of-truth systems (Li
 
 ## 5. Skills
 
-Each skill is one file in `agents/strategist/skills/<name>.md`. Skills load conditionally based on trigger context (Cyrus routes by keyword / Linear tag / cron job).
+Each skill is one file in `agents/strategist/skills/<name>.md`. The router resolves one skill per session (selector, else Linear label, else phrase intent, else conversational job).
 
 ---
 
@@ -234,9 +234,9 @@ The PM skill produces **per-feature PRDs** — one feature at a time, with detai
 ### 5.5 `curator` — Knowledge Curator
 
 **Triggers**
-- Scheduled cron — weekly Friday afternoon.
-- Post-merge hook (GitHub Action calls Cyrus webhook) on PRs that touch `docs/` or `CLAUDE.md` or `*.md` in service roots.
-- Slack: `@strategist-agent curate docs` for explicit invocation.
+- Scheduled — `strategist-curator-weekly-drift-sweep` in `scheduler/schedules.yml`, Friday afternoon; default `enabled: false`.
+- Slack: `@strategist-agent curate docs` for explicit invocation. The only trigger that works today.
+- A post-merge hook on doc-touching PRs was the intent; it does not exist. No GitHub Action calls the router, and a merged PR reaches only its own agent.
 - **Scope includes the agents' own configs** — `dev-team/agents/*/CLAUDE.md` and `agents/*/SPEC.md` are in scope. The curator can flag when an agent's own prompt has drifted from its behavior.
 - **Includes a Product-Marketing weekly sync pass** (per [Product-Marketing Sync Protocol](../PROTOCOLS.md#3-product-marketing-sync-protocol)): read what `@marketer-agent` contributed to `_shared/strategist-marketer/` since the last sync marker; update own internal state if relevant (e.g. a new approved testimonial means future PRDs can cite it); append a brief entry to `sync-log.md` confirming "noted X, took action Y."
 
@@ -465,7 +465,7 @@ After Phase 0:
 
 ## 6. Memory & state
 
-Strategist persists state in `dev-team-state` under both global and project-scoped paths. Cyrus's SessionStart hook loads relevant files at the start of each session — not all of them, only those matching the trigger context.
+Strategist persists state in `dev-team-state` under both global and project-scoped paths. The router's SessionStart hook loads relevant files at the start of each session — not all of them, only those matching the trigger context.
 
 ### Global (cross-project)
 
@@ -604,7 +604,7 @@ Examples of voice in practice:
 | Source-of-truth disagreement (code says X, docs say Y) | Detected during curator scan or PRD drafting | Flag the inconsistency in the output, route to `curator` skill if not already there |
 | MCP / API outage (Linear / analytics / GitHub) | Tool call fails | Degrade gracefully: produce what you can with what's accessible, list what was missing |
 | Linear write rejected (e.g. trying to move status without slash command) | Tiered-permission check fails | Reply with the slash command the human should run; never retry the same forbidden action |
-| Spend cap reached | Cyrus pre-launch check fails | Cyrus refuses to start the session; alert posts to `#agents-alerts`; no Strategist code change needed |
+| Spend cap reached | The router's pre-launch check fails | The router refuses to start the session; alert posts to `#agents-alerts`; no Strategist code change needed |
 
 ## 11. Implementation notes (for CLAUDE.md + skill drafting)
 
@@ -632,7 +632,7 @@ For `agents/strategist/settings.json`:
   - `SessionEnd`: commit any state changes back to `dev-team-state`.
 - `max_turns`: 30 (most skills don't need this many; cap protects against runaway loops).
 
-For `cyrus/cyrus.config.json` (the Cyrus side):
+For the router side (`identities/strategist.yml` + skill resolution in `router/src/routing/skill.ts`):
 
 - Route the trigger phrases listed in each skill's §5 to the strategist persona.
 - Map skill activation to keywords in the trigger message — e.g. "PRD" / "spec" → pm skill loaded; "research" / "evaluate" → researcher skill loaded.

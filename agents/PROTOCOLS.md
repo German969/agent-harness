@@ -526,7 +526,7 @@ states_available: [full, empty, loading, error]
 
 6. **On-demand requests** — when Marketer requests a specific screenshot (Linear ticket / `@client-agent screenshot <surface> <state>`), Builder-Client produces it. **SLA: ~2 hours for routine requests** (existing surface, no special data setup); ~24 hours for complex requests (new data setup, new state, new responsive testing). Result posts to the library (general reuse) or campaign-assets folder (campaign-specific) with a comment to the requester citing the path.
 
-7. **Mobile-app screenshots** — Cyrus's Linux VM cannot build iOS (macOS-only). For mobile native screenshots:
+7. **Mobile-app screenshots** — The router host (Linux) cannot build iOS (macOS-only). For mobile native screenshots:
    - **Web mobile viewport** (responsive layout at mobile breakpoint, e.g. 375x812): YES, Builder-Client can capture via the dev server + Claude Preview MCP.
    - **Native iOS / Android screenshots**: NO autonomously. Builder-Client produces a creative brief instead, pointing at simulator-based capture (a human runs it) or device capture, with the exact states/data setup needed.
 
@@ -668,12 +668,12 @@ Every `bug` ticket must carry exactly one severity label after Triage.
 | Label | Description | Applied by | When |
 |---|---|---|---|
 | `mvp` | MVP epic feature ticket | Strategist `founding` skill | Phase 0.6 (creating MVP feature tickets) |
-| `agent:strategist-bot` | Attributes a PR/ticket to a specific agent | Cyrus auto-applies based on `@<bot>` authoring | At PR/ticket creation by an agent |
-| `agent:server-bot` | (same — one per agent) | Cyrus | Agent-authored |
-| `agent:client-bot` | | Cyrus | |
-| `agent:platform-bot` | | Cyrus | |
-| `agent:guardian-bot` | | Cyrus | |
-| `agent:marketer-bot` | | Cyrus | |
+| `agent:strategist-bot` | Attributes a PR/ticket to a specific agent | **The agent applies it** — see the note below | At PR/ticket creation by an agent |
+| `agent:server-bot` | (same — one per agent) | The agent | Agent-authored |
+| `agent:client-bot` | | The agent | |
+| `agent:platform-bot` | | The agent | |
+| `agent:guardian-bot` | | The agent | |
+| `agent:marketer-bot` | | The agent | |
 
 #### Audit / preservation labels
 
@@ -698,7 +698,7 @@ Whoever creates a ticket adds the labels it can confidently apply. This is the f
 
 **Human creators** (via Linear UI): apply what they remember. Triage backstops the rest.
 
-Cyrus auto-applies the `agent:<bot>` attribution label on every ticket an agent creates.
+The agent applies the `agent:<bot>` attribution label itself. NOT automatic: the router only ever READS an `agent:` label (`resolvePrOwner` in routing/classifier.ts, to decide which agent owns a PR's events) and has no code that applies one. The only automatic path is a SessionEnd `git_commit_if_changed` with `create_pr` + `pr_labels`, which applies labels to a PR it opens. An agent that wants the label on a TICKET must set it when it creates the ticket.
 
 ### Layer 2 — Strategist `triage` skill is the backstop
 
@@ -800,7 +800,7 @@ This protocol documents:
 | 2 | **Context window exhausted (200K–1M tokens)** | Claude Code auto-compacts older turns. If compaction can't keep up (rare), the next message errors | ✅ Mostly automatic via compaction. Short-session design (per the agent specs) makes this unlikely in practice. |
 | 3 | **Per-response output cap (`max_tokens`)** | Response truncates with `stop_reason: max_tokens` | ✅ Claude Code sends a continuation message automatically |
 | 4 | **Per-job `max_turns` cap (configured per agent)** | Session terminates mid-task. Committed work is preserved; in-flight uncommitted changes are lost. | ⚠️ **Requires the `session-incomplete` marker** (defined below) for clean resumption on the next webhook event |
-| 5 | **Monthly spend cap (configured in `costCap`)** | Cyrus pre-launch check refuses to spawn a new session for that persona | ⚠️ **Requires human action** — raise the cap, wait for the period to roll over, or accept the agent is paused |
+| 5 | **Monthly spend cap (configured in `costCap`)** | The router's pre-launch check refuses to spawn a new session for that persona | ⚠️ **Requires human action** — raise the cap, wait for the period to roll over, or accept the agent is paused |
 
 ### Cost-cap configuration (in each agent's `settings.json`)
 
@@ -808,7 +808,7 @@ Every agent's `settings.json` carries a `costCap` block:
 
 ```json
 "costCap": {
-  "_comment": "Cyrus pre-launch check enforces these. Project-scoped (each project counts separately).",
+  "_comment": "The router's pre-launch check enforces the COST fields. Per-agent, NOT per-project — see the note below the field list.",
   "perJobCostUsd": 5.00,
   "perJobTokens": 500000,
   "monthlyCostUsd": 100.00,
@@ -821,22 +821,26 @@ Every agent's `settings.json` carries a `costCap` block:
 ```
 
 Field meanings:
-- **`perJobCostUsd` / `perJobTokens`** — single-session ceilings; hard stop on runaway loops. Cyrus terminates the session if either is hit.
-- **`monthlyCostUsd` / `monthlyTokensApprox`** — cumulative-per-month ceilings; checked before each session spawns. Once hit, Cyrus refuses new sessions until the period rolls over.
-- **`warnAtPercent`** — when MTD spend reaches this percentage of the monthly cap, an alert posts (handled by Platform's `finops` skill).
-- **`alertChannel`** — Slack channel for cap-related alerts.
-- **`onCapReached`** — `refuse_session` (default — bot pauses) or `queue_until_period_roll` (sessions queue and run when caps reset). Default is `refuse_session` since most teams want explicit human action when caps are hit.
-- **`offHoursThrottling`** — optional schedule for pausing non-critical agents during off-hours. `null` means no throttling. Format: `{ "tz": "America/Los_Angeles", "pauseFrom": "20:00", "pauseTo": "08:00", "pauseWeekends": true }`.
 
-Caps are **per-project**. A persona working across multiple projects accumulates separate ledgers per project. The Cyrus state tracks per-project utilization in `dev-team-state/projects/<project>/platform/cap-utilization.md`.
+Every field below is accepted by `settingsSchema.ts`. Only the two **cost** fields are enforced; the rest parse and are then ignored. Marked accordingly so nobody plans around a control that doesn't run.
+
+- **`perJobCostUsd`** — ✅ enforced. `sdkCall.ts` aborts the session once accumulated cost passes it.
+- **`monthlyCostUsd`** — ✅ enforced. `checkCostCap` in `runtime/preflight.ts` refuses to spawn when month-to-date + `perJobCostUsd` would exceed it.
+- **`perJobTokens` / `monthlyTokensApprox`** — ❌ **not enforced.** Neither name appears outside the schema. Token spend is *recorded* (`cost_ledger`) but never gates anything; the dollar caps are the only ceiling.
+- **`warnAtPercent`** — ✅ enforced, by the ROUTER, not by Platform. `runtime/capWarnings.ts` posts to `alertChannel` on first crossing of `warnAtPercent` and of 100%, once per level per month. Platform's `finops` skill reports on utilization; it does not raise these alerts.
+- **`alertChannel`** — ✅ Slack channel the two cap alerts above post to.
+- **`onCapReached`** — ❌ **not enforced.** The schema accepts `refuse_session | throttle | alert_only`, but `runPreflight` refuses unconditionally on a cap hit whatever the value says. (`queue_until_period_roll`, which this doc previously described, was never even a valid value.)
+- **`offHoursThrottling`** — ❌ **not enforced.** Typed `z.unknown()`; nothing reads it. See the off-hours section below.
+
+Caps are **per-agent, fleet-wide** — NOT per-project. `cost_ledger` is keyed `(agent, year, month, day)` with no project column (`state/migrations/000-init.sql`), so one persona working across two projects spends against a single shared ledger. A per-project cap and a `cap-utilization.md` state file were the intent; neither exists. Splitting the ledger by project needs an additive migration plus a project key on the write path.
 
 ### Where caps live in the spending hierarchy
 
 Per [AGENTS.md → Multi-project planning](../AGENTS.md#multi-project-planning):
 
-- **Per-project per-persona cap** (this protocol) — hard stop when hit.
-- **Global cap per persona** (cross-project — covered in AGENTS.md) — informational ceiling for budget tracking; alerts at 80% / 100% but doesn't hard-stop (the per-project cap is the gate).
-- **Per-job cap** (this protocol) — within a single session.
+- **Per-persona monthly cap** (this protocol) — hard stop when hit. Intended as per-project; implemented fleet-wide per agent (see above).
+- **Global cap per persona** (cross-project — covered in AGENTS.md) — today this and the row above are the SAME number, because the ledger has no project dimension.
+- **Per-job cap** (this protocol) — within a single session. Enforced on dollars only.
 
 ### The `session-incomplete` marker
 
@@ -844,7 +848,7 @@ When a session terminates mid-task (scenario #4 — hit `max_turns`, or any othe
 
 #### Writing the marker (when terminating mid-task)
 
-If the agent senses it's about to terminate (high turn count approaching `max_turns`, context near limit, explicit termination from Cyrus), **before exiting**:
+If the agent senses it's about to terminate (high turn count approaching `max_turns`, context near limit, explicit termination from the router), **before exiting**:
 
 1. **Commit anything that can be safely committed.** Small WIP commits with clear messages (`[ENG-1234] WIP: error handling started, tests pending`) are fine — better than losing work.
 2. **Update the relevant state file** (typically `dev-team-state/projects/<project>/<agent>/active-prs.md`) with an `INCOMPLETE NEEDS RESUME` marker:
@@ -889,7 +893,7 @@ Each agent's primary state file:
 Platform's `finops` skill monitors per-persona cap utilization and posts to `#agents-alerts` when:
 
 - **Persona reaches 80% of monthly cap** — informational. "@strategist-agent is at 82% of monthly cap with 9 days remaining. Projected month-end: 105%. Suggest reviewing recent expensive sessions or raising the cap."
-- **Persona reaches 100% of monthly cap** — actionable. "@strategist-agent has hit its monthly cap for `<project>`. Cyrus is now refusing new sessions for this persona until the period rolls over on `<date>` OR a human raises the cap. To raise: edit `dev-team/agents/strategist/settings.json` → `costCap.monthlyCostUsd`."
+- **Persona reaches 100% of monthly cap** — actionable. "@strategist-agent has hit its monthly cap for `<project>`. The router is now refusing new sessions for this persona until the period rolls over on `<date>` OR a human raises the cap. To raise: edit `dev-team/agents/strategist/settings.json` → `costCap.monthlyCostUsd`."
 - **Per-job cap hit (mid-session)** — urgent. "@server-agent session on ENG-1234 hit per-job cap of $5.00. Session terminated. INCOMPLETE NEEDS RESUME marker written to active-prs.md. Investigate: was this a runaway loop?"
 - **Cost anomaly** — investigation. Per the `finops` skill's existing anomaly detection.
 
@@ -907,7 +911,7 @@ For non-critical agents (Marketer, Strategist's PjM scheduled jobs, Curator), `o
 }
 ```
 
-During paused hours, Cyrus refuses to spawn the agent **except** for tickets carrying labels in `exceptForLabels`. P0/P1 incidents always run; routine work waits for morning.
+❌ **NOT IMPLEMENTED.** Neither pause windows nor `exceptForLabels` appear in `router/src`, and every agent's `offHoursThrottling` is `null`. Nothing pauses an agent by hour today, so nothing needs a P0/P1 carve-out either. Kept as the intended design — under it, P0/P1 incidents would always run and routine work would wait for morning. The cost controls that DO run are the pre-launch monthly-cap check and the per-job cost cap.
 
 Don't apply off-hours throttling to:
 - Guardian (PR review needs to happen as PRs open, not in batches)

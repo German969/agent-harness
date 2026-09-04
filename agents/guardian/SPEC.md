@@ -293,8 +293,8 @@ Each skill is one file in `agents/guardian/skills/<name>.md`.
 **Triggers**
 - Paths in AI service dirs (`server/services/ai/**`, prompt files, eval files).
 - `@guardian-agent llm-redteam <feature>` for focused sessions.
-- Scheduled weekly run against production AI features.
-- After Anthropic (or whichever model vendor) ships a model update — Cyrus webhook triggers a re-run to catch regressions.
+- Scheduled weekly against production AI features — `guardian-llm-security-weekly-eval` in `scheduler/schedules.yml`; default `enabled: false`.
+- A model-update webhook was the intent; it does not exist. Nothing watches for a vendor release, so a post-update re-run is a human asking for one (`@guardian-agent llm-redteam <feature>`).
 
 **This is the skill the user specifically called out. It is a defensive discipline against information leakage and manipulation through the product's LLM features.**
 
@@ -528,7 +528,7 @@ Guardian's voice is **direct, evidence-based, never accusatory**.
 | Compliance finding requires legal interpretation | Beyond Guardian's authority | Flag for human + don't take a side on the legal call |
 | Test that Guardian wrote is flaky | CI flake on Guardian's own follow-up test PR | Investigate the flake; if Guardian's test is wrong, fix it; never skip/disable a flaky test as a quick fix |
 | Eval suite is itself buggy (false-negatives in adversarial evals) | A real attack works but the eval says "pass" | Treat as a critical-priority maintenance task on the suite; fix the eval; add a regression test for the missed case |
-| Spend cap reached | Cyrus pre-launch check | Cyrus refuses to start; alert; no Guardian code change needed |
+| Spend cap reached | The router's pre-launch check | The router refuses to start; alert; no Guardian code change needed |
 
 ## 11. Implementation notes (for CLAUDE.md + skill drafting)
 
@@ -567,7 +567,14 @@ For `agents/guardian/settings.json`:
   - `PostToolUse` for any write: run lint/format on the changed files.
   - `SessionEnd`: commit state changes; ensure the unified review comment got posted.
 
-For `cyrus/cyrus.config.json`:
+For the router side (`identities/guardian.yml` + `router/src/routing/skill.ts`):
+
+> **Design target, not current behaviour.** There is no `cyrus/cyrus.config.json` in this repo. Ingress routing (event → agent) lives in `identities/guardian.yml`; skill resolution (event → skill) lives in `router/src/routing/skill.ts`, and it picks **exactly one** skill per session — nothing loads a second skill "alongside" another.
+>
+> What resolves today: the selectors `threat-model` → `security`, `llm-redteam` → `llm-security`, `perf-profile` → `performance`, `compliance-review` → `compliance`, `design-system-review` → `design-system`; any work trigger → `qa`; a bare mention → `conversational`. Path-tier classification is NOT router-side — the `qa` skill does it in Step 0 from `sensitive-paths.yml`.
+> Guardian's `github_auto_triggers` are declared in `identities/guardian.yml`, but its `github.app_id` is still `~`: with no GitHub App there is no installation, no token and no webhook, so the PR-open auto-fire has never run.
+> Cron: the five `guardian-*` entries in `scheduler/schedules.yml` are all `enabled: false`. There is no Anthropic model-update webhook — nothing watches for a vendor release.
+
 - Trigger routing:
   - GitHub PR open / push / `@guardian-agent review` → ingest, classify path tier, run all enabled skills.
   - Linear tag matches → specific skill activation.

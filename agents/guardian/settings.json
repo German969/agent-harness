@@ -14,7 +14,7 @@
   "max_turns": 30,
 
   "costCap": {
-    "_comment": "Cyrus pre-launch check enforces these. Project-scoped. Guardian fires on every PR open + weekly LLM-security eval. The eval suite is the biggest single expense if AI features exist. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
+    "_comment": "The router's pre-launch check enforces the cost fields (per agent, fleet-wide — the ledger has no project dimension). Guardian is CONFIGURED to auto-fire on every PR open and to run a weekly LLM-security eval, but neither happens today: identities/guardian.yml has app_id: ~ (no GitHub App), and guardian-llm-security-weekly-eval is enabled: false. Budget for when both are live — the eval suite is the biggest single expense once AI features exist. See agents/PROTOCOLS.md → Token / Cost Resilience Protocol.",
     "perJobCostUsd": 5.00,
     "perJobTokens": 500000,
     "monthlyCostUsd": 100.00,
@@ -372,7 +372,7 @@
     "guardian_self_edit_exception": "Guardian CAN modify its own sensitive-paths.yml and perf-sensitive-paths.yml via PRs to dev-team repo. This is the only narrow exception to the 'never edit dev-team config' rule.",
     "mcp_servers_required": ["linear", "github", "slack", "anthropic (for LLM-as-judge in llm-security skill)"],
     "future_additions": [
-      "Path-tier classification could move to a Cyrus middleware so all agents see consistent classification — currently each Guardian session classifies independently",
+      "Path-tier classification could move to a router middleware so all agents see consistent classification — currently each Guardian session classifies independently",
       "LLM-as-judge using a different model than the one being tested (avoid circular bias)",
       "Production-sampling for llm-security weekly eval (currently synthetic-only)",
       "Cross-PR pattern detection (e.g. 3 PRs in a row missing the same kind of test → flag a systemic gap)"

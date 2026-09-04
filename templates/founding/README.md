@@ -1,6 +1,6 @@
 # Founding Templates
 
-This directory holds **project-agnostic blueprints** for the foundational docs every Cyrus-managed agent reads at session start. The templates themselves don't describe a specific project — they describe the *shape* a project's founding docs should have so the agents can load them consistently.
+This directory holds **project-agnostic blueprints** for the foundational docs every router-managed agent reads at session start. The templates themselves don't describe a specific project — they describe the *shape* a project's founding docs should have so the agents can load them consistently.
 
 ## What's here vs. what's in your project
 
