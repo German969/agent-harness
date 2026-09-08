@@ -71,11 +71,7 @@
       "mcp__social__list_drafts",
       "mcp__social__get_draft",
 
-      "mcp__posthog__query",
-      "mcp__ga4__query",
-      "mcp__mixpanel__query",
-      "mcp__amplitude__query",
-      "mcp__plausible__query",
+      "mcp__analytics__query",
 
       "Bash(ls:*)",
       "Bash(cat:*)",

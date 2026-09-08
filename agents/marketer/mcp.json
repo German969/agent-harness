@@ -33,8 +33,9 @@
       "_comment": "Slack MCP — post draft notifications + weekly summaries to #marketing, #growth, #leadership (per agent's channel allow-list)."
     },
 
-    "_cms_template": {
+    "_cms": {
       "_TBD_in_phase_6": true,
+      "_key_note": "Renamed from `_cms_template`: a server key must equal the `mcp__<server>__` prefix its permission entries use, so `mcp__cms__create_draft` requires a `cms` (or `_cms`) key here. Same for _email / _social / _analytics.",
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "<the-cms-mcp-package-once-chosen>"],
@@ -44,7 +45,7 @@
       "_comment": "CMS MCP — once the toolbelt decision is made in Phase 6 (Webflow / Ghost / WordPress / Contentful / Sanity / MDX-in-git / etc.), populate this entry. CRITICAL: the MCP must expose ONLY draft-class actions (create_draft, update_draft, list_drafts, get_draft). Verbs like publish / schedule_publish / set_status_published are denied by Marketer's PreToolUse action-verb hook AND should be denied in settings.json's deny list. Rename this key from `_cms_template` to `cms` once the actual MCP is wired."
     },
 
-    "_email_template": {
+    "_email": {
       "_TBD_in_phase_6": true,
       "type": "stdio",
       "command": "npx",
@@ -55,7 +56,7 @@
       "_comment": "Email platform MCP — Customer.io / Mailchimp / Brevo / Resend / Loops / etc. (chosen in Phase 6). CRITICAL: must expose ONLY draft-class actions (create_draft, update_draft, list_drafts, get_segment_size). NEVER send, schedule_send, or set_status_active. Rename `_email_template` to `email` once wired."
     },
 
-    "_social_template": {
+    "_social": {
       "_TBD_in_phase_6": true,
       "type": "stdio",
       "command": "npx",
@@ -66,7 +67,7 @@
       "_comment": "Social scheduler MCP — Buffer / Hootsuite / Typefully / etc. CRITICAL: must expose ONLY draft-class actions in unscheduled state (create_draft, update_draft, list_drafts). NEVER post, post_now, schedule_post. Rename to `social` once wired."
     },
 
-    "_analytics_template": {
+    "_analytics": {
       "_TBD_in_phase_6": true,
       "type": "stdio",
       "command": "npx",

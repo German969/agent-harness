@@ -2,6 +2,10 @@
   "_comment": "Guardian MCP set — Linear + GitHub + Slack baseline. Security scanners (gitleaks, trufflehog, snyk, osv-scanner), a11y tools (axe, lighthouse), perf tools (k6, artillery) are all Bash commands in settings.json — not MCPs. The LLM-as-judge mechanism used by the llm-security skill is router-mediated (a sub-session call), not an MCP. Verify package names before Phase 1 deploy.",
 
   "mcpServers": {
+    "_anthropic": {
+      "_TBD": true,
+      "_comment": "Anthropic API MCP — NOT WIRED. Declared because permissions.allow names `mcp__anthropic__judge_*`, the LLM-as-judge calls the `llm-security` skill uses for red-team scoring. A `_` prefix means planned and skipped by both activeServers() and collectInProcessMcp(). Distinct from Platform's `_anthropic_usage` (scoring vs billing). The key must equal the `mcp__<server>__` prefix used in permissions."
+    },
     "_linear": {
       "type": "stdio",
       "command": "npx",

@@ -282,7 +282,6 @@
         "paths": ["**"],
         "message_template": "[harness] ${SKILL}: ${SUMMARY}",
         "create_pr": true,
-        "pr_template": "harness",
         "pr_labels": [
           "agent:harness-bot"
         ],

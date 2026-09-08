@@ -14,9 +14,10 @@
 // Checks, in the order a person would ask them:
 //   1. Every agent directory loads — settings.json and mcp.json pass their schemas.
 //   2. Every hook command has a registered handler (the hook schema is open-shaped
-//      on purpose, so a typo validates fine and then silently does nothing), and
+//      on purpose, so a typo validates fine and then silently does nothing),
 //      `permissions.ask` is empty — nothing reads it, so an entry there is a tool
-//      that is available while the config says it is gated.
+//      that is available while the config says it is gated — and every MCP tool in
+//      `permissions.allow` names a server the agent's mcp.json declares.
 //   3. Every model, including per-skill overrides, is priced by the rate table.
 //   4. Identity files parse, and agents and identities correspond 1:1 — an identity
 //      with no agent directory routes events to a config that cannot load, and an
@@ -222,6 +223,44 @@ for (const agent of agents) {
   }
 }
 
+// 2c — every `mcp__<server>__*` entry in permissions.ALLOW names a server the agent's
+//      mcp.json declares. An allow list is a claim about what the agent can do; naming
+//      a server that appears nowhere is a claim about a tool that cannot exist.
+//
+//      A `_` prefix counts as declared. That is the convention this check makes load-
+//      bearing: `_`-prefixed servers are skipped by BOTH activeServers() and
+//      collectInProcessMcp(), so the prefix already means "planned, currently off" —
+//      Guardian's `_linear` and Builder-Client's `_claude-preview` are real capabilities
+//      waiting on a secret or a decision, not mistakes. What the check catches is the
+//      other case: a permission naming nothing at all.
+//
+//      DENY is deliberately unchecked. Denying a server this fleet does not have is
+//      free insurance for the day it does — `mcp__deploy__*` and `mcp__secrets__*`
+//      appear on several agents for exactly that reason.
+for (const agent of agents) {
+  let cfg: ReturnType<typeof loadAgentConfig>;
+  try {
+    cfg = loadAgentConfig(agent, { devTeamRoot: repoRoot });
+  } catch {
+    continue; // already reported by check 1
+  }
+  const declared = new Set(
+    Object.keys(cfg.mcp.mcpServers ?? {}).map((name) =>
+      name.replace(/^_+/, '').replace(/-/g, '_').toLowerCase(),
+    ),
+  );
+  for (const rule of cfg.settings.permissions.allow) {
+    const match = /^mcp__([A-Za-z0-9_]+?)__/.exec(rule);
+    if (!match?.[1]) continue;
+    const server = match[1].replace(/-/g, '_').toLowerCase();
+    if (!declared.has(server)) {
+      problems.push(
+        `${agent}: permissions.allow has '${rule}', but no server '${server}' is declared in agents/${agent}/mcp.json — declare it (a '_' prefix means planned-and-off) or drop the entry`,
+      );
+    }
+  }
+}
+
 // 3 — every configured model is priced. auditFleetModels logs the detail; we only
 // need the count here, and it re-reports agents whose config failed above.
 const unpriced = auditFleetModels(agents, repoRoot, {
@@ -409,5 +448,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every resolvable skill has a file, every agent sees the vault index, sensitive-paths.yml well-formed`,
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, sensitive-paths.yml well-formed`,
 );

@@ -2,6 +2,22 @@
   "_comment": "Platform MCP set — Linear + GitHub + Slack baseline. FinOps reads spend from the router's cost_ledger directly (internal, not MCP). Release Manager uses GitHub MCP for releases. ADR work uses file Read/Edit tools (not MCP). Verify package names before Phase 1 deploy.",
 
   "mcpServers": {
+    "_billing": {
+      "_TBD": true,
+      "_comment": "Cloud-billing MCP — NOT WIRED. Declared because permissions.allow names `mcp__billing__read_*`. Read-only cost data for the `finops` skill. A `_` prefix means planned-and-skipped; the key must equal the `mcp__<server>__` prefix used in permissions."
+    },
+    "_anthropic_usage": {
+      "_TBD": true,
+      "_comment": "Anthropic usage/cost API MCP — NOT WIRED. Declared because permissions.allow names `mcp__anthropic_usage__read_*`. Feeds the fleet spend reporting the `finops` skill produces, which today reads the router's own sessions table instead."
+    },
+    "_monitoring": {
+      "_TBD": true,
+      "_comment": "Monitoring MCP — NOT WIRED. Declared because permissions.allow names `mcp__monitoring__read_*`. Read-only; the `incident-response` skill needs alert and metric history. Blocked on the Phase 6 toolbelt choice."
+    },
+    "_observability": {
+      "_TBD": true,
+      "_comment": "Tracing / log-query MCP — NOT WIRED. Declared because permissions.allow names `mcp__observability__query_*`. Read-only; distinct from `_monitoring` (alerts vs traces). Blocked on the Phase 6 toolbelt choice."
+    },
     "linear": {
       "type": "sdk",
       "_comment": "In-process Linear MCP (mcp__linear__list_teams / list_labels / search_issues / create_issue / create_comment / create_label). Router-hosted wrapper over Linear's GraphQL API, authed with the session's ${LINEAR_TOKEN} (from Infisical LINEAR_TOKEN_platform). Only the always-allowed tier is exposed — status change / reassign / close / archive / delete are intentionally not tools (AGENTS.md tiered Linear scope). Replaces the deprecated @modelcontextprotocol/server-linear stdio package. See router/src/linear/linearMcp.ts. Platform files architectural-review tickets, incident-response tickets, finops cost-related tickets."

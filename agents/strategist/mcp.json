@@ -4,6 +4,10 @@
   "_note_mcp_baked": "RESOLVED (was _followup_npx_mcp_hardening): the github/slack/filesystem stdio MCP servers are now baked into the router image (deploy/Dockerfile: `npm install -g`, exact-pinned) and invoked by absolute path (/usr/local/bin/mcp-server-*) instead of `npx -y`, so spawning is deterministic + offline — no more per-session install and no npx-cache SIGKILL under disk pressure. Exceptions that intentionally stay on npx: the `_linear` placeholders (inactive, `_`-prefixed) and builder-client's `@anthropic-ai/mcp-claude-preview` (an evolving preview package a version pin would freeze).",
 
   "mcpServers": {
+    "_analytics": {
+      "_TBD": true,
+      "_comment": "Analytics MCP — NOT WIRED. Declared because permissions.allow names `mcp__analytics__read_*` and a permission entry may only name a server this file declares; a `_` prefix means the server is planned and currently skipped by both activeServers() and collectInProcessMcp(). Blocked on the Phase 6 toolbelt choice (PLAN.md). READ-ONLY when wired — the `ba` skill queries, never writes. The server key must equal the `mcp__<server>__` prefix the permission entries use."
+    },
     "linear": {
       "type": "sdk",
       "gated_mutations": true,

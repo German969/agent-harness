@@ -43,7 +43,12 @@ type GitCommitIfChangedConfig = {
    */
   push?: boolean;
   create_pr?: boolean;
-  pr_template?: string;
+  // `pr_template` used to sit here. Nothing ever read it, and Harness was the only
+  // config to set it (`"harness"`), naming a template that exists nowhere. The PR
+  // body it wanted is PROTOCOLS.md §7's Harness Change Protocol structure — Summary /
+  // Rationale / Changes / Cross-impact / Test plan / Risk / Agents affected — which
+  // the agent writes with real content rather than a static string. Use
+  // `pr_body_template` for a fixed preamble; anything else the agent authors.
   /** Labels applied to the opened PR. `pr_label` (a single string) is the older
    *  spelling three agents still use; both are read so neither is silently
    *  dropped — an `agent:<name>` owner label going missing is what makes the
