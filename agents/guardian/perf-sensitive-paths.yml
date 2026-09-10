@@ -1,0 +1,229 @@
+# Guardian's perf-scan path registry — the companion to sensitive-paths.yml, and the
+# file `performance.md`, Guardian's SPEC and CLAUDE.md have all cited since they were
+# written, and which did not exist until now.
+#
+# It lives here, beside sensitive-paths.yml, because that is where every consumer
+# already looks: settings.json `writeScope`, the SessionEnd hook that opens a PR for it,
+# `performance.md`'s activation list and CLAUDE.md's blast radius all name
+# `agents/guardian/perf-sensitive-paths.yml`. SPEC.md §6 places it in project state
+# instead — SPEC is the stale row, the same way it is for sensitive-paths.yml. Both
+# files belong in one place; this is that place.
+#
+# WHO READS THIS
+#   - Guardian's `performance` skill, to decide whether a PR's diff warrants a perf
+#     pass. READ THE ACTIVATION REALITY SECTION BELOW before trusting that sentence.
+#   - NOT `pnpm validate:fleet`. Check 6 in router/scripts/validate-fleet-config.ts
+#     validates sensitive-paths.yml only — this file's companion is unchecked, so a
+#     malformed entry here fails silently and reads as coverage that is not there.
+#     Extending check 6 to cover both registries is a Harness change; until it lands,
+#     hand-verify that this file parses after editing it.
+#
+# WHO WRITES IT
+#   Guardian only — the same narrow self-edit exception that covers sensitive-paths.yml.
+#   Code-writing agents propose in a PR comment and never edit this file.
+#
+#   The SessionEnd `git_commit_if_changed` hook in settings.json is configured to open
+#   that PR automatically (`create_pr: true`, both registries in its `paths`). It cannot:
+#   validate:fleet reports "guardian: create_pr on repo 'dev-team', which the router
+#   cannot write — the hook skips before the PR call". So a Guardian session that edits
+#   this file today has its change dropped at SessionEnd. Until the router mounts
+#   dev-team writable, an edit reaches this repo only through a human or a session like
+#   the one that created the file.
+#
+# HOW IT DIFFERS FROM sensitive-paths.yml
+#   sensitive-paths.yml picks a scan DEPTH (skip / light / deep) for the whole review.
+#   This file is binary and single-purpose: does the diff warrant a perf pass at all.
+#   A path can be in both, in either, or in neither. `packages/db/drizzle/**` is in
+#   both, for different reasons — a migration is irreversible (security) AND can lock a
+#   hot table (perf).
+
+version: 1
+
+# ============================================================================
+# ACTIVATION REALITY — read this before adding a pattern
+# ============================================================================
+# `performance.md` lists four activation triggers. As the router is wired today, THREE
+# OF THE FOUR CANNOT FIRE. Recorded here rather than in a session transcript, because a
+# registry that implies it is consulted when nothing consults it is the exact failure
+# shape dev-team-state/shared/process/harness-behavior.md catalogues.
+#
+#   1. "Paths in perf-sensitive-paths.yml"  -> DEAD TWICE OVER. No SessionStart hook in
+#      agents/guardian/settings.json loads this file, so no session has it in context.
+#      And PR-triggered Guardian sessions resolve to `qa` (WORK_DEFAULT_SKILLS), not
+#      `performance` — the router picks exactly one skill per session.
+#   2. "Linear `perf` tag"                  -> DEAD. `perf` is not in LABEL_SKILLS
+#      (router/src/routing/skill.ts), so a perf-labelled ticket falls through to
+#      WORK_DEFAULT_SKILLS['guardian'] = 'qa'.
+#   3. "Perf-regression CI alert"           -> DEAD. The target project has no perf
+#      benchmarks in CI and no alert ingress exists.
+#   4. "@guardian-agent perf-profile <x>"   -> WORKS. The `perf-profile` selector is in
+#      SKILL_SELECTORS and resolves to `performance`. This is the ONLY live path.
+#
+#   Also dead: `guardian-performance-monthly-baseline-review` in scheduler/schedules.yml
+#   is `enabled: false` and gated on `phase-5`.
+#
+# So today this file serves the human-invoked `perf-profile` session, and the `qa` skill
+# insofar as its reviewer reads it. Making trigger 1 live needs two changes in this repo
+# that are NOT Guardian's to make — a `load` hook entry gated `only_skills: [performance]`,
+# and either a `perf` -> `performance` LABEL_SKILLS entry or a fan-out from `qa`. Both are
+# Harness's call under the Harness Change Protocol (PROTOCOLS.md §7).
+
+# ============================================================================
+# Categories
+# ============================================================================
+# Why a path is perf-bearing. Kept deliberately coarse — the value is in the `reason`
+# on each entry, not in the taxonomy.
+categories:
+  - query-plan        # index definitions, migrations that change them, query shape
+  - vector-retrieval  # pgvector / HNSW / hybrid-retrieval parameters
+  - llm-latency       # model calls, context assembly, token volume
+  - hot-path          # request handlers and workers on the ingest->reply path
+  - bundle            # client bundle size and render cost
+  - queue             # job queue throughput and its contention with the API
+
+# ============================================================================
+# Patterns
+# ============================================================================
+# Each entry carries why it was added, per the discipline sensitive-paths.yml uses.
+# Two kinds live here on purpose, same as that file. CONCRETE patterns name code that
+# exists in iris today. FORWARD patterns name paths that do not exist yet, so the first
+# commit at one gets a perf pass on the PR that introduces it rather than a release later.
+patterns:
+  # --- concrete: code that exists in iris today ---
+  - glob: "packages/db/src/schema/**"
+    category: query-plan
+    added: 2026-09-10
+    reason: >-
+      Every index in the product is defined here — 16 of them across six tables. An index
+      added, dropped or reordered here changes a query plan with nothing in the diff
+      saying so, and ADR-0016's repository layer owns the tenant_id predicate invisibly,
+      so an index that does not lead with tenant_id will not look wrong at the call site.
+  - glob: "packages/db/src/schema/knowledge.ts"
+    category: vector-retrieval
+    added: 2026-09-10
+    reason: >-
+      Carries the HNSW build parameters (m: 16, ef_construction: 64) and all three
+      retrieval indexes ADR-0018 requires — HNSW/cosine on embedding, GIN over
+      to_tsvector('spanish', content), GIN over to_tsvector('spanish', question). ADR-0018
+      sets those parameters explicitly so that changing them is a reviewed migration
+      rather than an ambient setting. This entry is what makes the review happen.
+  - glob: "packages/db/drizzle/**"
+    category: query-plan
+    added: 2026-09-10
+    reason: >-
+      The committed migration SQL. Two perf concerns the security tier does not cover:
+      an index build on a populated table can lock it, and a migration is where an index
+      change actually reaches production. Also in sensitive-paths.yml, for the different
+      reason that migrations are irreversible.
+  - glob: "packages/llm/**"
+    category: llm-latency
+    added: 2026-09-10
+    reason: >-
+      Every model call goes through this package. Latency, token volume and per-message
+      cost attribution all originate here, and ADR-0008's per-tenant token buckets are
+      the cost-isolation mechanism a change here can bypass. A path that skips the bucket
+      is a perf finding even when wall-clock latency is unchanged.
+  - glob: "apps/iris-api/src/**"
+    category: hot-path
+    added: 2026-09-10
+    reason: >-
+      The API and, when they land, the worker processes — the ingest->reply path the M2
+      latency gate measures. A health controller today; this pattern is here so the first
+      real handler is scanned on the PR that adds it.
+  - glob: "apps/iris-web/app/api/**"
+    category: hot-path
+    added: 2026-09-10
+    reason: >-
+      Next.js route handlers — the public HTTP surface of the dashboard. Also a
+      sensitive-paths deep entry (webhooks family); the perf concern is independent.
+  - glob: "apps/iris-web/{next.config.mjs,package.json,tailwind.config.ts}"
+    category: bundle
+    added: 2026-09-10
+    reason: >-
+      Bundle-size regressions arrive through config and dependency changes far more often
+      than through component code. Scoped to the three files rather than apps/iris-web/**
+      so ordinary UI work does not arm a perf pass it does not need.
+
+  # --- forward-looking: paths that do not exist yet ---
+  - glob: "**/{retrieval,rag,search}/**"
+    category: vector-retrieval
+    added: 2026-09-10
+    reason: >-
+      Where the hybrid retriever will live. ADR-0018 runs the vector and lexical halves as
+      SEPARATE tenant-scoped queries merged by Reciprocal Rank Fusion, so a change widening
+      either candidate set widens both costs and the merge is over the union. Nothing
+      matches this today.
+  - glob: "**/{conversation-engine,conversation}/**"
+    category: llm-latency
+    added: 2026-09-10
+    reason: >-
+      The context-window assembly path. ADR-0009 bounds history to ~20 turns or ~4k tokens,
+      whichever is smaller; widening it is a latency and cost change on EVERY turn,
+      platform-wide, never a per-tenant tweak.
+  - glob: "**/{worker,workers}-*/**"
+    category: queue
+    added: 2026-09-10
+    reason: >-
+      STACK.md puts pg-boss in the primary Postgres, so queue throughput and query load
+      share one instance — a worker that polls harder competes with the API. The five
+      worker process types (conversation, ingest, builder-agent, billing, safety) are
+      designed and unbuilt.
+  - glob: "**/{embedding,embeddings,chunking}/**"
+    category: vector-retrieval
+    added: 2026-09-10
+    reason: >-
+      Chunk boundaries are baked into stored rows (ADR-0018) — changing chunk size or
+      overlap means re-embedding every tenant's corpus. The number that belongs in such a
+      finding is the cost of the MIGRATION, not of the request.
+
+# ============================================================================
+# Benchmarks and thresholds
+# ============================================================================
+benchmarks:
+  harness: none
+  checked: 2026-09-10
+  checked_against: chatbots@e80b839
+  note: >-
+    There is no benchmark harness in the target project — no k6, no artillery, no bench
+    script anywhere under apps/, packages/ or tools/, and no tests/ directory at all.
+    Nothing in CI measures latency, throughput or bundle size.
+
+  target_of_record:
+    metric: whatsapp ingest -> reply, non-streaming
+    p50_ms: 4000
+    p95_ms: 8000
+    source: >-
+      milestone-plan.md M2 states this as an EXIT-GATE requirement, not a follow-up check:
+      "answers" and "answers within SLA" are different gates.
+    guardian_rule: >-
+      This is a TARGET, not a measurement. Do not report a regression against it — with
+      nothing measured there is no before. Until a harness lands, every perf finding on
+      iris is `suspected` or `low-confidence` by construction, and the finding must say so.
+
+  regression_thresholds:
+    status: not_in_effect
+    note: >-
+      The monthly baseline review in scheduler/schedules.yml names >10% regression and
+      >20% improvement as its flags. Recorded for when a baseline exists; they cannot be
+      evaluated against nothing. The baseline file itself
+      (dev-team-state/projects/iris/guardian/perf/baseline.md) is deliberately absent
+      until the first benchmark runs.
+
+# ============================================================================
+# What a finding from this file may claim
+# ============================================================================
+# performance.md requires every finding be classified. With no benchmarks, only the
+# lower two are reachable — stating that in the finding is what keeps the reviewer's
+# trust when Guardian cannot prove the number.
+finding_classes:
+  - id: regression-confirmed
+    means: "Measured before and after. Post the numbers."
+    reachable_today: false
+  - id: suspected
+    means: "A known pattern matched in the diff, with a named constraint it violates. Cite the ADR."
+    reachable_today: true
+  - id: low-confidence
+    means: "Pattern-only, no constraint identified. Say so, or do not file it."
+    reachable_today: true
+
+pattern_library: dev-team-state/global/guardian/perf-pattern-library.md
