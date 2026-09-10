@@ -88,7 +88,7 @@ Each skill is one file in `agents/platform/skills/<name>.md`.
 ### 5.1 `architect` — Software Architecture
 
 **Triggers**
-- PR opened that's architecturally significant (touches service boundaries, adds a dependency, changes a cross-cutting pattern — detected by path/size heuristics in `agents/platform/arch-review-paths.yml`).
+- PR opened that's architecturally significant (touches service boundaries, adds a dependency, changes a cross-cutting pattern — detected by path/size heuristics in `dev-team-state/projects/<project>/platform/arch-review-paths.yml`, per §6). **Not wired:** `identities/platform.yml` sets `github_auto_triggers: []`, so no PR opens Platform, and the heuristics file has never been created.
 - `@platform-agent` mention requesting an ADR or design opinion.
 - Linear ticket with `architecture` tag.
 - **Contract design request** during planning (review a proposed contract for cross-service consistency).
@@ -406,7 +406,7 @@ dev-team-state/projects/<project>/platform/
 ├── adr-index.md                     ★ One-line-per-ADR index for this project — loaded by EVERY agent at SessionStart (small enough to load eagerly; individual ADR bodies fetched on demand)
 ├── adrs/                            Project ADRs (mirror of docs/adrs/, for fast load)
 ├── active-refactors.md              In-flight refactors + their status
-├── arch-review-paths.yml            Which paths trigger architecture review on PR open
+├── arch-review-paths.yml            Which paths trigger architecture review on PR open (NOT YET CREATED — this is the canonical location; §5.1 previously named agents/platform/ instead)
 ├── runbooks-index.md                Index of operational runbooks
 ├── release-log.md                   Last release point, cadence, version history
 ├── cost-history.md                  Billing history, baselines, past anomalies
@@ -584,7 +584,7 @@ For the router side (`identities/platform.yml` + `router/src/routing/skill.ts`):
 
 ## 12. Open questions
 
-1. **Architecture-review path heuristics** — what makes a PR "architecturally significant" enough to auto-review? Default: touches >1 service, adds a dependency, changes a shared package, or matches `arch-review-paths.yml`. Tune after observing false-positive rate.
+1. **Architecture-review path heuristics** — what makes a PR "architecturally significant" enough to auto-review? Default: touches >1 service, adds a dependency, changes a shared package, or matches `arch-review-paths.yml` (project-scoped state, per §6). Tune after observing false-positive rate — which needs the PR trigger wired first.
 2. **Incident agent authority** — the default is "propose, never execute." Is there a tightly-scoped exception (e.g. the agent may execute a rollback to the immediately-previous known-good version *if* a human has pre-authorized rollback-only for this service)? Lean: allow pre-authorized rollback-only as an opt-in per service; everything else stays human-executed.
 3. **Release cadence** — fixed weekly, or continuous (release on every merge to default)? Decide per project; affects whether release-manager is scheduled or event-driven.
 4. **FinOps billing access** — which billing sources have MCP/API access? At minimum the Anthropic usage API (to watch the agent fleet) and the VPS/cloud bill. Inventory in Phase 1.

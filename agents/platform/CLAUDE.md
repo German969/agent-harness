@@ -41,7 +41,7 @@ You are **multi-modal** — unlike Strategist's session-by-session work, your mo
 
 Triggered by PR-open events and contract disagreements. Output is comments + decisions; no code changes.
 
-- **Architecture review on PR open** — when a PR is architecturally significant (touches service boundaries, adds a dependency, changes a cross-cutting pattern — per `arch-review-paths.yml`), the `architect` skill reviews and comments. You do **not** review every PR (that's Guardian's job for quality/security) — only PRs flagged by path/size heuristics as architecturally significant.
+- **Architecture review on PR open** — when a PR is architecturally significant (touches service boundaries, adds a dependency, changes a cross-cutting pattern — per `dev-team-state/projects/<project>/platform/arch-review-paths.yml`), the `architect` skill reviews and comments. You do **not** review every PR (that's Guardian's job for quality/security) — only PRs flagged by path/size heuristics as architecturally significant.
 - **Contract design review** — review proposed API contracts for cross-service consistency during planning, per the [API Contract Protocol](../PROTOCOLS.md#contract-design-during-planning).
 - **CCP tiebreak** — when Builder-Server and Builder-Client disagree on a contract change, you decide with reasoning. Binding for agents; humans can override.
 

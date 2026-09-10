@@ -7,7 +7,7 @@ description: Software architecture — writes ADRs (Architecture Decision Record
 
 ## Activate when
 
-- PR opened that matches `arch-review-paths.yml` (architecturally significant — touches service boundaries, adds a dependency, changes a cross-cutting pattern)
+- PR opened that matches `dev-team-state/projects/<project>/platform/arch-review-paths.yml` (architecturally significant — touches service boundaries, adds a dependency, changes a cross-cutting pattern). Not wired today: `github_auto_triggers: []`, and the file does not exist
 - `@platform-agent` mention requesting an ADR or design opinion
 - Linear ticket labeled `architecture`
 - **Contract design request** during planning (review a proposed contract for cross-service consistency, per the [API Contract Protocol](../../PROTOCOLS.md#contract-design-during-planning))
