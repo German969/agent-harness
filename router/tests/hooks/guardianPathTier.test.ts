@@ -21,17 +21,27 @@ import type { SessionContext } from '../../src/hooks/types.js';
 const devTeamRoot = join(process.cwd(), '..');
 const log = pino({ level: 'silent' });
 
-function tierTableHook(): Record<string, unknown> {
+/**
+ * The LAST `load` hook whose paths end with `file`. Guardian declares two registries
+ * and delivers them at different tiers, so "the hook for this file" has to be found by
+ * filename, not by position — and `endsWith` matters: `sensitive-paths.yml` is a suffix
+ * of `perf-sensitive-paths.yml`, so a naive `includes` finds the wrong hook.
+ */
+function registryHook(file: string): Record<string, unknown> {
   const cfg = loadAgentConfig('guardian', { devTeamRoot });
   const hooks = (cfg.settings.hooks?.SessionStart ?? []) as Array<Record<string, unknown>>;
   const hook = hooks.find(
     (h) =>
       h.command === 'load' &&
       Array.isArray(h.paths) &&
-      (h.paths as string[]).some((p) => p.endsWith('guardian/sensitive-paths.yml')),
+      (h.paths as string[]).some((p) => p.endsWith(`guardian/${file}`)),
   );
-  if (!hook) throw new Error('guardian has no SessionStart load hook for sensitive-paths.yml');
+  if (!hook) throw new Error(`guardian has no SessionStart load hook for ${file}`);
   return hook;
+}
+
+function tierTableHook(): Record<string, unknown> {
+  return registryHook('sensitive-paths.yml');
 }
 
 function ctxFor(skill: string): SessionContext {
@@ -90,6 +100,66 @@ describe('guardian path-tier table', () => {
       expect(typeof entry.glob).toBe('string');
       expect(families.has(entry.family as string)).toBe(true);
       expect(String(entry.reason ?? '').trim().length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// HAR-10. perf-sensitive-paths.yml shipped in #54 and no hook loaded it, so the
+// `performance` skill's first documented activation trigger — "Paths in perf-sensitive
+// areas (defined in agents/guardian/perf-sensitive-paths.yml)" — had nothing to match
+// against. Same shape as the block above: that the hook DELIVERS the file, and that the
+// skills which never consult it do not pay for it.
+describe('guardian perf-scan registry', () => {
+  const perfHook = () => registryHook('perf-sensitive-paths.yml');
+
+  it('reaches a performance session, with the perf patterns in it', async () => {
+    const res = await loadHandler(perfHook(), ctxFor('performance'));
+    expect(res.kind).toBe('context');
+    const content = (res as { content: string }).content;
+    // Match the load header, not a bare path: sensitive-paths.yml's own prose cites
+    // this file, so a substring check reports it loaded when only a reference is.
+    expect(content).toContain('# dev-team/agents/guardian/perf-sensitive-paths.yml');
+    expect(content).toContain('packages/db/src/schema/knowledge.ts');
+    expect(content).toContain('vector-retrieval');
+    expect(content).toContain('categories:');
+  });
+
+  it.each(['qa', 'security', 'conversational'])('does NOT load for a %s session', async (skill) => {
+    // The only_skills gate is the whole point. qa and security are the two that would
+    // otherwise pick it up cheaply-looking — they already carry the heaviest hook, and
+    // neither reads this registry.
+    const res = await loadHandler(perfHook(), ctxFor(skill));
+    expect(res.kind).toBe('side-effect');
+  });
+
+  it('is a DIFFERENT hook from the one carrying sensitive-paths.yml', () => {
+    // Guards the endsWith above. If a future edit folds the perf registry into the
+    // tier-table hook, the negative assertions become vacuous rather than failing.
+    expect(perfHook()).not.toBe(tierTableHook());
+    expect(perfHook().only_skills).toEqual(['performance']);
+  });
+
+  it('every pattern names a declared category, and reasons are non-empty', () => {
+    // Duplicated from validate:fleet deliberately — except validate:fleet does NOT
+    // cover this file yet (that is HAR-12). Until it does, this is the only check on
+    // the shape of a registry Guardian is permitted to edit itself.
+    const doc = load(
+      readFileSync(join(devTeamRoot, 'agents', 'guardian', 'perf-sensitive-paths.yml'), 'utf-8'),
+    ) as { categories: string[]; patterns: Array<Record<string, unknown>> };
+
+    expect(doc.categories.length).toBeGreaterThan(0);
+    expect(doc.patterns.length).toBeGreaterThan(0);
+
+    const categories = new Set(doc.categories);
+    const seen = new Set<string>();
+    for (const entry of doc.patterns) {
+      const glob = entry.glob as string;
+      expect(typeof glob).toBe('string');
+      expect(seen.has(glob)).toBe(false);
+      seen.add(glob);
+      expect(categories.has(entry.category as string)).toBe(true);
+      expect(String(entry.reason ?? '').trim().length).toBeGreaterThan(0);
+      expect(Number.isNaN(new Date(String(entry.added)).getTime())).toBe(false);
     }
   });
 });

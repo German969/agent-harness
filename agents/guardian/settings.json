@@ -270,6 +270,17 @@
           "dev-team/agents/guardian/sensitive-paths.yml"
         ],
         "missing": "warn"
+      },
+      {
+        "_comment": "The perf-scan path registry (12.5KB, ~3K tokens), for the one skill that reads it. `performance`'s first documented activation trigger is 'Paths in perf-sensitive areas (defined in agents/guardian/perf-sensitive-paths.yml)' and until this hook existed there was nothing to match against — the file shipped in #54 and no hook loaded it. Its own hook rather than an addition to the heavy-context load above, because the other five review skills never consult it and that hook is already the expensive one. Mirrors how sensitive-paths.yml is delivered, one tier narrower.",
+        "command": "load",
+        "only_skills": [
+          "performance"
+        ],
+        "paths": [
+          "dev-team/agents/guardian/perf-sensitive-paths.yml"
+        ],
+        "missing": "warn"
       }
     ],
     "PreToolUse": [
