@@ -1,0 +1,159 @@
+# Platform's architecture-review path heuristics — the file `agents/platform/CLAUDE.md`
+# (Mode A), `agents/platform/SPEC.md` (§"Triggers", the repo tree, and the open question
+# on tuning), and `agents/platform/skills/architect.md` have all referenced since they
+# were written, and which did not exist until now.
+#
+# The same gap Guardian found and closed in `agents/guardian/sensitive-paths.yml`, in
+# Platform's half of the fleet: a declared behaviour with nothing executing it. Three
+# documents describe an architecture review that fires on PR open; the heuristics they
+# all delegate to were never written, so nothing could fire.
+#
+# WHO READS THIS
+#   - `pnpm validate:fleet` (check 6b), which is the ONLY automated reader today. It
+#     checks this file parses and every entry is well-formed; it does not review anything.
+#   - Platform's `architect` skill, when a human directs a review — the state of things
+#     as of writing. Platform deliberately does NOT review every PR; that is Guardian's
+#     job for quality and security (CLAUDE.md Mode A).
+#   - No scheduled or event-driven consumer exists. See the next section, which is not
+#     a caveat on this list but the reason the list is this short.
+#
+# WHO WRITES IT
+#   Platform only. Other agents propose additions as a PR comment.
+#
+# NOTHING EXECUTES THIS YET — read before assuming a webhook fires
+#   `identities/platform.yml` sets `github_auto_triggers: []`, with the comment
+#   "Platform doesn't auto-fire on PR events". The obvious fix is to declare
+#   `pull_request.opened` there the way `identities/guardian.yml` does. IT DOES NOT WORK,
+#   and it fails silently, which is worse than not working.
+#
+#   `router/src/routing/registry.ts` builds the auto-trigger map as ONE AGENT PER EVENT
+#   TYPE, first writer wins:
+#
+#       for (const trigger of id.routing?.github_auto_triggers ?? []) {
+#         if (!githubAutoTriggers.has(trigger)) githubAutoTriggers.set(trigger, id.agent);
+#       }
+#
+#   Identities load in `readdirSync` order, which is alphabetical here: guardian before
+#   platform. Guardian already claims `pull_request.opened`, `.synchronize` and
+#   `.reopened`. Measured, not reasoned — adding all three to platform.yml and rebuilding
+#   the registry still resolves every one of them to `guardian`. Platform's entries would
+#   be dead config, which is the exact defect this file exists to close.
+#
+#   That single-agent map is deliberate, not an oversight. `classifier.ts` explains it:
+#   GitHub fans every event to every installed app under one delivery GUID, and an
+#   earlier fallback woke every agent at once on a single `issues.opened`.
+#
+#   So this file is COMPLETE AND UNCONSUMED until a human picks one of:
+#     a. Router change — make the map `Map<trigger, AgentId[]>` and let the classifier
+#        fan out. Real refactor: `Classification` returns one target today, and the
+#        single-agent map is load-shedding by design.
+#     b. Claim a different event Guardian does not — e.g. `pull_request.labeled`, gated
+#        on an `arch-review` label. Works with no router change, but takes `.labeled`
+#        away from the PR-owner route in step 3 of the classifier, which is a behaviour
+#        change for Builders whose PRs get labeled.
+#     c. Chain from Guardian's existing PR session when these patterns match.
+#     d. Invoke Platform from CI in the target repo rather than through the router.
+#
+#   None of those is a side effect of writing heuristics, so none of them is done here.
+#   Recorded so the next reader does not rediscover it, or worse, "fix" it by adding the
+#   line to platform.yml and believing it took.
+#
+# TIERS — two, not Guardian's three. Platform has no "light" tier because Platform has
+# no remit over every PR. A PR is either architecturally significant or it is silent.
+#   review  matches a `patterns` glob, or trips a `shape` rule. Always comments, even
+#           "no architectural concerns", so a reviewer can see the review ran.
+#   skip    everything else. No comment. Silence here is correct, not a failure.
+#
+# PRECEDENCE: review wins. One matching path makes the whole PR reviewable.
+#
+# MARKER: every review comment ends with `<!-- platform-arch-review: <head-sha> -->`.
+# A PR whose current head already carries that marker is not reviewed again; a new push
+# changes the sha and earns a fresh review. Worth keeping whichever option above is
+# chosen: GitHub redelivers webhooks, and (b) would fire on every label change.
+
+version: 1
+
+# ---------------------------------------------------------------------------
+# Path patterns. Each entry carries why it is here, following the convention
+# `agents/guardian/sensitive-paths.yml` established.
+#
+# Two kinds, on purpose. INFRA patterns are Platform's own blast radius — a change
+# there is Platform's subject matter by definition. BOUNDARY patterns are places where
+# a change alters how the system is put together rather than what it does.
+# ---------------------------------------------------------------------------
+patterns:
+  # --- Platform's own blast radius (CLAUDE.md Mode B: "infra files only") ---
+  - glob: ".github/workflows/**"
+    area: ci-cd
+    added: 2026-09-18
+    reason: "CI topology. A workflow change alters what every future PR is checked against, so it is evaluated once here rather than by each PR that later passes through it."
+  - glob: "**/Dockerfile*"
+    area: deploy-unit
+    added: 2026-09-18
+    reason: "The deploy unit. ADR-0015 deferred proving the image builds to the provider wiring; what the image CONTAINS is still an architectural statement about what ships."
+  - glob: "**/.dockerignore"
+    area: deploy-unit
+    added: 2026-09-18
+    reason: "Decides what enters the build context. IRS-6 found a latent `.env` leak here that `.gitignore` did not cover — the two files are not the same list and drift silently."
+  - glob: "{terraform,pulumi,infra,deploy}/**"
+    area: iac
+    added: 2026-09-18
+    reason: "IaC. None exists in iris today (ADR-0004 is lean PaaS, configured in provider consoles); this is here so the first commit of it is reviewed on the PR that introduces it."
+
+  # --- the architecture record itself ---
+  - glob: "docs/adrs/**"
+    area: adr
+    added: 2026-09-18
+    reason: "ADRs are Platform's output. A PR editing one is either superseding a decision or correcting a record, and both want Platform's eyes. Note this is where Platform's tiers diverge from Guardian's, which skips all of docs/**."
+  - glob: "docs/architecture/**"
+    area: system-overview
+    added: 2026-09-18
+    reason: "SYSTEM.md is the overview every agent inherits at SessionStart. SPEC.md §111 requires it to move in the same PR as a materially architectural ADR; this catches the case where it moves without one."
+  - glob: "founding/STACK.md"
+    area: stack
+    added: 2026-09-18
+    reason: "Stack non-negotiables. Outside Platform's write scope, inside its review scope — IRS-71 and IRS-73 were both false capability claims that entered here and propagated into ADRs before anyone called the provider."
+
+  # --- how the system is assembled ---
+  - glob: "{pnpm-workspace.yaml,turbo.json,tsconfig*.json}"
+    area: build-topology
+    added: 2026-09-18
+    reason: "ADR-0015 owns monorepo tooling. A workspace-glob or task-graph change decides what CI runs and what turbo caches — German969/chatbots#22 added a fourth workspace root with no record, which is the case this pattern exists for."
+  - glob: "{package.json,apps/*/package.json,packages/*/package.json,tools/*/package.json,tests/*/package.json}"
+    area: dependency
+    added: 2026-09-18
+    reason: "SPEC.md names 'adds a dependency' as architecturally significant. A manifest is where that is declared; the lockfile is deliberately NOT matched, because it churns on every transitive bump and would make this rule fire constantly and be ignored."
+  - glob: "**/*.module.ts"
+    area: service-boundary
+    added: 2026-09-18
+    reason: "NestJS module composition is where iris-api's internal boundaries are actually drawn (ADR-0002, modular monolith). A new module or a changed import graph is a boundary change even when no file moves."
+
+# ---------------------------------------------------------------------------
+# Shape rules. SPEC.md says "path/size heuristics" — these are the size half.
+# Evaluated over the PR's whole changed-file set, not per file.
+# ---------------------------------------------------------------------------
+shape:
+  - id: crosses-workspace-roots
+    added: 2026-09-18
+    rule: "changed files span two or more of apps/ · packages/ · tools/ · tests/"
+    reason: "A change crossing workspace roots is either a boundary moving or a contract changing. Single-root changes are a feature; multi-root changes are a shape."
+  - id: new-workspace-member
+    added: 2026-09-18
+    rule: "adds a package.json at a new path under apps/, packages/, tools/ or tests/"
+    reason: "A new workspace member is a new deploy unit or a new shared boundary. There is no such thing as an uninteresting one."
+  - id: large-diff
+    added: 2026-09-18
+    rule: "more than 600 changed lines across more than 10 files"
+    reason: "A deliberately blunt backstop for changes that are architectural without touching a listed path. Expected to produce false positives; SPEC.md §587 says to tune after observing the rate, and that tuning needs a starting number to observe."
+
+# ---------------------------------------------------------------------------
+# Never review. Narrow on purpose: this is not a skip tier, it is an exclusion
+# list for paths that would otherwise match a pattern above and should not.
+# ---------------------------------------------------------------------------
+never:
+  - glob: "docs/legacy/**"
+    added: 2026-09-18
+    reason: "Preserved sources. `docs/legacy/ARCHITECTURE-2026-07-25-preserved.md` is deliberately never edited and carries claims already superseded elsewhere; reviewing a change to it would be reviewing history."
+  - glob: "pnpm-lock.yaml"
+    added: 2026-09-18
+    reason: "Excluded explicitly rather than by omission, because the dependency pattern above would otherwise tempt a future editor to add it. Manifests declare intent; the lockfile records resolution."
