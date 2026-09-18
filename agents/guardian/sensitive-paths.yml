@@ -49,14 +49,49 @@ families:
   - webhooks
   - audit
 
-# Docs-only changes. Matched against the WHOLE changed-file set: if every changed
-# path matches one of these, the tier is skip.
+# Inert prose. Matched against the WHOLE changed-file set: if every changed path
+# matches one of these, the tier is skip.
+#
+# NARROWED 2026-09-16. This list used to be `docs/**` + `**/*.md`, which skipped every
+# markdown file in the repo. That is the wrong test: **a file being markdown says nothing
+# about whether changing it changes behaviour.** Four classes were being skipped that
+# should not have been —
+#
+#   founding/**          the stack, product, brand and COMPLIANCE of record.
+#                        compliance-scope.yml is DERIVED from founding/COMPLIANCE.md, so a
+#                        change here can invalidate the very baseline Guardian loads on
+#                        every review session, and Guardian was configured not to look.
+#   docs/adrs/**         accepted architecture decisions.
+#   docs/architecture/** SYSTEM.md, which CLAUDE.md's founding-docs gate requires before
+#                        Guardian will review anything at all.
+#   docs/runbooks/**     procedures a human executes against live infrastructure. Not
+#                        prose — code with a person as the interpreter.
+#   .claude/**           agent instructions stored as markdown. Changing one changes what
+#                        an agent does; the extension is incidental.
+#
+# WHAT PROMPTED IT: chatbots PR #26 (2026-09-16) changed founding/STACK.md, an ADR and a
+# runbook. Guardian classified it skip and posted nothing. Copilot reviewed the same diff
+# and found four real defects, including an unguarded `read` that could have migrated the
+# wrong database if the prompt were interrupted. Guardian's own eval of that PR was that
+# the routine behaved exactly as configured — which made the configuration the finding.
+#
+# These paths now fall to LIGHT, not deep. Light comments only when there are findings, so
+# a genuinely prose-only change to an ADR stays silent. The cost is a scan, not noise.
+#
+# DIVERGENCE, DELIBERATE AND TRACKED: AGENTS.md → "Guardian auto-trigger — three-tier path
+# scan" still states the old skip row as a locked decision. This file is the one every
+# consumer actually reads, so it leads; reconciling AGENTS.md is HAR-15. Until that lands,
+# AGENTS.md is the stale copy — the same way SPEC.md §6 is stale about this file's
+# location.
 skip:
-  - "docs/**"
-  - "**/*.md"
+  - "README.md"
+  - "CONTRIBUTING.md"
+  - "**/README.md"
+  - "docs/GLOSSARY.md"
+  - "docs/legacy/**"
   - "CODEOWNERS"
-  - "LICENSE"
   - ".github/CODEOWNERS"
+  - "LICENSE"
 
 # Deep-tier patterns. Every entry carries why it was added, per PROTOCOLS.md §2
 # ("Each addition carries a brief comment explaining why it was added").
