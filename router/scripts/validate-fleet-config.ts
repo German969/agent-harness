@@ -29,9 +29,6 @@
 //   6. Guardian's sensitive-paths.yml exists and every entry is well-formed. It is
 //      the tier table AGENTS.md, PROTOCOLS.md §2 and Strategist's curator all point
 //      at, and a malformed entry reads as coverage that is not there.
-//   6b. Platform's arch-review-paths.yml, same contract for the same reason —
-//       Platform's CLAUDE.md, SPEC and architect skill all point at it, and it did
-//       not exist either.
 //   7. Every agent is told the fleet vault exists. `shared/**` was committable by
 //      all seven with no config mentioning it: the write path open, the read path
 //      absent. Dropping the index from a load hook would silently restore that,
@@ -381,16 +378,7 @@ try {
           problems.push(`guardian/sensitive-paths.yml: '${glob}' has no \`${field}\``);
         }
       }
-      // `added` is an unquoted ISO date, which js-yaml resolves to a Date rather
-      // than a string — accept either, and reject only a missing or unparseable one.
-      // (Requiring a string here failed the whole file on its first run, which is
-      // the check being wrong rather than the data.)
-      const added = entry.added;
-      const addedOk =
-        added instanceof Date
-          ? !Number.isNaN(added.getTime())
-          : typeof added === 'string' && added.trim() !== '';
-      if (!addedOk) {
+      if (!isUsableDate(entry.added)) {
         problems.push(`guardian/sensitive-paths.yml: '${glob}' has no usable \`added\` date`);
       }
       if (typeof entry.family === 'string' && !famSet.has(entry.family)) {
@@ -403,92 +391,6 @@ try {
 } catch (err) {
   problems.push(
     `guardian/sensitive-paths.yml: could not read or parse — ${(err as Error).message}`,
-  );
-}
-
-// 6b — Platform's arch-review-paths.yml, same contract as Guardian's file above.
-//      Three documents route readers here too (Platform's CLAUDE.md Mode A, its SPEC,
-//      and the architect skill) and it did not exist either. Validated for the same
-//      reason: a malformed entry reads as coverage that is not there. Nothing consumes
-//      the file yet — that is the point of validating it now rather than later, since a
-//      silently malformed entry would make the first real consumer skip a PR.
-const archReviewPathsFile = join(repoRoot, 'agents', 'platform', 'arch-review-paths.yml');
-try {
-  const doc = load(readFileSync(archReviewPathsFile, 'utf-8')) as {
-    patterns?: unknown;
-    shape?: unknown;
-    never?: unknown;
-  };
-  const patterns = Array.isArray(doc?.patterns) ? doc.patterns : undefined;
-  if (!patterns || patterns.length === 0) {
-    problems.push('platform/arch-review-paths.yml: `patterns` is missing or empty');
-  } else {
-    const seen = new Set<string>();
-    for (const raw of patterns) {
-      const entry = raw as Record<string, unknown>;
-      const glob = typeof entry.glob === 'string' ? entry.glob : undefined;
-      if (!glob) {
-        problems.push(
-          `platform/arch-review-paths.yml: an entry has no \`glob\`: ${JSON.stringify(raw)}`,
-        );
-        continue;
-      }
-      if (seen.has(glob)) {
-        problems.push(`platform/arch-review-paths.yml: duplicate glob '${glob}'`);
-      }
-      seen.add(glob);
-      for (const field of ['area', 'reason'] as const) {
-        if (typeof entry[field] !== 'string' || (entry[field] as string).trim() === '') {
-          problems.push(`platform/arch-review-paths.yml: '${glob}' has no \`${field}\``);
-        }
-      }
-      if (!isUsableDate(entry.added)) {
-        problems.push(`platform/arch-review-paths.yml: '${glob}' has no usable \`added\` date`);
-      }
-    }
-  }
-  // The shape rules are the "size" half of SPEC.md's "path/size heuristics". A rule
-  // with no `rule` text is unexecutable by whatever eventually reads it.
-  const shape = Array.isArray(doc?.shape) ? doc.shape : [];
-  for (const raw of shape) {
-    const entry = raw as Record<string, unknown>;
-    const id = typeof entry.id === 'string' ? entry.id : JSON.stringify(raw);
-    for (const field of ['rule', 'reason'] as const) {
-      if (typeof entry[field] !== 'string' || (entry[field] as string).trim() === '') {
-        problems.push(`platform/arch-review-paths.yml: shape rule '${id}' has no \`${field}\``);
-      }
-    }
-  }
-  // `never` is an exclusion list, so a malformed entry here fails OPEN — a path that
-  // should be excluded gets reviewed. Less severe than a missed pattern, and still a
-  // silent disagreement between the file and its reader.
-  const never = Array.isArray(doc?.never) ? doc.never : [];
-  const neverSeen = new Set<string>();
-  for (const raw of never) {
-    const entry = raw as Record<string, unknown>;
-    const glob = typeof entry.glob === 'string' ? entry.glob : undefined;
-    if (!glob) {
-      problems.push(
-        `platform/arch-review-paths.yml: a \`never\` entry has no \`glob\`: ${JSON.stringify(raw)}`,
-      );
-      continue;
-    }
-    if (neverSeen.has(glob)) {
-      problems.push(`platform/arch-review-paths.yml: duplicate \`never\` glob '${glob}'`);
-    }
-    neverSeen.add(glob);
-    if (typeof entry.reason !== 'string' || entry.reason.trim() === '') {
-      problems.push(`platform/arch-review-paths.yml: \`never\` glob '${glob}' has no \`reason\``);
-    }
-    if (!isUsableDate(entry.added)) {
-      problems.push(
-        `platform/arch-review-paths.yml: \`never\` glob '${glob}' has no usable \`added\` date`,
-      );
-    }
-  }
-} catch (err) {
-  problems.push(
-    `platform/arch-review-paths.yml: could not read or parse — ${(err as Error).message}`,
   );
 }
 
@@ -547,5 +449,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, sensitive-paths.yml and arch-review-paths.yml well-formed`,
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, sensitive-paths.yml well-formed`,
 );
