@@ -26,7 +26,7 @@
 //      now given its skill's markdown as context, so a mapping that points at a
 //      file that is not there delivers no procedure — silently, exactly like the
 //      dead hooks and the stub formatter before it.
-//   6. Guardian's sensitive-paths.yml exists and every entry is well-formed. It is
+//   6. BOTH of Guardian's glob registries exist and every entry is well-formed. It is
 //      the tier table AGENTS.md, PROTOCOLS.md §2 and Strategist's curator all point
 //      at, and a malformed entry reads as coverage that is not there.
 //   7. Every agent is told the fleet vault exists. `shared/**` was committable by
@@ -38,7 +38,6 @@
 // fixing config one CI run at a time is how a five-minute edit becomes an hour.
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { load } from 'js-yaml';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAgentConfig } from '../src/config/agentLoader.js';
@@ -48,6 +47,8 @@ import {
   getToolCallHandler,
   inferCommand,
 } from '../src/hooks/registry.js';
+import type { GlobRegistrySpec } from '../src/config/globRegistry.js';
+import { validateGlobRegistryFile } from '../src/config/globRegistry.js';
 import { loadIdentities } from '../src/routing/loader.js';
 import { resolvableSkills } from '../src/routing/skill.js';
 import { auditFleetModels } from '../src/runtime/modelCheck.js';
@@ -102,16 +103,6 @@ const KNOWN_DEAD_HOOKS = new Set<string>([
  * deliberately, and an entry that stops applying is reported so this shrinks.
  */
 const KNOWN_STUBBED_HOOKS = new Set<string>();
-
-/** `added` is an unquoted ISO date, which js-yaml resolves to a Date rather than a
- *  string — accept either. A string is only usable if it PARSES: the previous check
- *  accepted any non-empty text while its own diagnostic said "usable date", so
- *  `added: not-a-date` passed. */
-function isUsableDate(value: unknown): boolean {
-  if (value instanceof Date) return !Number.isNaN(value.getTime());
-  if (typeof value !== 'string' || value.trim() === '') return false;
-  return !Number.isNaN(new Date(value).getTime());
-}
 
 // 1 + 2 — configs load, and every hook command actually resolves to a handler.
 // The hook schema is open-shaped on purpose (Phase 6b validates per command), so a
@@ -335,62 +326,42 @@ if (inertPrHooks.length > 0) {
   for (const entry of inertPrHooks) console.warn(`  - ${entry}`);
 }
 
-// 6 — Guardian's sensitive-paths.yml parses and every entry is well-formed.
-//     Three separate documents route readers here (AGENTS.md's tier table,
-//     PROTOCOLS.md §2, Strategist's curator backstop) and the file did not exist at
-//     all until it was written. A silently malformed entry is the failure that
-//     matters: the tier table would still load, and a deep path would review light.
-const sensitivePathsFile = join(repoRoot, 'agents', 'guardian', 'sensitive-paths.yml');
-try {
-  const doc = load(readFileSync(sensitivePathsFile, 'utf-8')) as {
-    families?: unknown;
-    skip?: unknown;
-    patterns?: unknown;
-  };
-  const families = Array.isArray(doc?.families) ? (doc.families as string[]) : undefined;
-  if (!families || families.length === 0) {
-    problems.push('guardian/sensitive-paths.yml: `families` is missing or empty');
-  }
-  if (!Array.isArray(doc?.skip)) {
-    problems.push('guardian/sensitive-paths.yml: `skip` must be a list of globs');
-  }
-  const patterns = Array.isArray(doc?.patterns) ? doc.patterns : undefined;
-  if (!patterns || patterns.length === 0) {
-    problems.push('guardian/sensitive-paths.yml: `patterns` is missing or empty');
-  } else {
-    const famSet = new Set(families ?? []);
-    const seen = new Set<string>();
-    for (const raw of patterns) {
-      const entry = raw as Record<string, unknown>;
-      const glob = typeof entry.glob === 'string' ? entry.glob : undefined;
-      if (!glob) {
-        problems.push(`guardian/sensitive-paths.yml: an entry has no \`glob\`: ${JSON.stringify(raw)}`);
-        continue;
-      }
-      if (seen.has(glob)) {
-        problems.push(`guardian/sensitive-paths.yml: duplicate glob '${glob}'`);
-      }
-      seen.add(glob);
-      // `reason` is not decoration: PROTOCOLS.md §2 requires every addition to say
-      // why, so a future reader can judge whether it still applies.
-      for (const field of ['family', 'reason'] as const) {
-        if (typeof entry[field] !== 'string' || (entry[field] as string).trim() === '') {
-          problems.push(`guardian/sensitive-paths.yml: '${glob}' has no \`${field}\``);
-        }
-      }
-      if (!isUsableDate(entry.added)) {
-        problems.push(`guardian/sensitive-paths.yml: '${glob}' has no usable \`added\` date`);
-      }
-      if (typeof entry.family === 'string' && !famSet.has(entry.family)) {
-        problems.push(
-          `guardian/sensitive-paths.yml: '${glob}' names family '${entry.family}', which is not in the declared families list`,
-        );
-      }
-    }
-  }
-} catch (err) {
+// 6 — Guardian's TWO glob registries parse and every entry is well-formed.
+//     Three separate documents route readers to sensitive-paths.yml (AGENTS.md's tier
+//     table, PROTOCOLS.md §2, Strategist's curator backstop) and the file did not exist
+//     at all until it was written. perf-sensitive-paths.yml (#54) had the same gap in
+//     reverse: four files cite it and nothing validated it.
+//
+//     A silently malformed entry is the failure that matters in both: the registry
+//     still loads, and a deep path reviews light. One shared code path rather than two
+//     copies — see src/config/globRegistry.ts for the shape differences it absorbs.
+const GLOB_REGISTRIES: Array<{ file: string; spec: GlobRegistrySpec }> = [
+  {
+    file: 'sensitive-paths.yml',
+    spec: {
+      label: 'guardian/sensitive-paths.yml',
+      taxonomyKey: 'families',
+      entryKey: 'family',
+      requireSkip: true,
+    },
+  },
+  {
+    file: 'perf-sensitive-paths.yml',
+    spec: {
+      label: 'guardian/perf-sensitive-paths.yml',
+      taxonomyKey: 'categories',
+      entryKey: 'category',
+      // No `skip` list: the perf scan has no equivalent of the tier table's
+      // "never deep-review these" set.
+      requireSkip: false,
+    },
+  },
+];
+for (const { file, spec } of GLOB_REGISTRIES) {
   problems.push(
-    `guardian/sensitive-paths.yml: could not read or parse — ${(err as Error).message}`,
+    ...validateGlobRegistryFile(join(repoRoot, 'agents', 'guardian', file), spec, (p) =>
+      readFileSync(p, 'utf-8'),
+    ),
   );
 }
 
@@ -449,5 +420,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, sensitive-paths.yml well-formed`,
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, both guardian glob registries well-formed`,
 );
