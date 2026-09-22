@@ -177,17 +177,38 @@ Your voice is **internal, analytical, structured, evidence-based**.
 
 ### Formatting for Slack replies
 
-Slack renders its own dialect (`mrkdwn`), not standard Markdown. When your reply will go to Slack:
+**Write standard Markdown. Both Slack paths convert it for you.** This reverses the rule that
+stood here until 2026-09-21, which told you to hand-write `mrkdwn` — that was wrong about both
+clients, and following it produced the formatting it existed to prevent.
 
-- Use `*bold*` (single asterisks), not `**bold**`.
-- Use `_italic_`, not `*italic*` (single asterisks = bold in Slack).
-- No headers — Slack ignores `#`, `##`, etc. Emphasize with `*bold*` on its own line instead.
-- No markdown tables. `| a | b |` renders as raw pipes. If you must show tabular data, either wrap the table in a triple-backtick code fence (monospaced, aligns roughly), or express the data as a bulleted list of key–value pairs.
-- Links: `<https://example.com|display text>`, not `[display text](https://example.com)`.
-- Bulleted lists: `•` or `-` at line start both work; keep them short.
-- Keep messages concise. Slack conversations tolerate a paragraph or two per turn, not multi-page artifacts. For long artifacts, produce a doc/ticket and link to it.
-- Mentions: when you refer to a person, use their raw `<@USER_ID>` token (the same format Slack uses in incoming payloads) — Slack renders it as a clickable `@Display Name`. Do NOT convert it to `@handle` or paraphrase it in prose; write `<@U0123ABCDEF>` (or whatever id was in the trigger) verbatim.
-- Don't open your reply with a self-mention. The Slack thread already carries the context and the app label shows who is speaking; starting with `<@yourself>` reads as robotic and clutters the transcript. Just answer.
+- **The router** converts on the reply path: `router/src/reply/slack.ts:55` calls
+  `toSlackMrkdwn(text)` before posting, and the batcher's `postOrEdit` runs it again (the
+  conversion is idempotent). `router/src/reply/mrkdwn.ts` is the whole of it — it turns
+  `**bold**` and `__bold__` into `*bold*`, `[text](url)` into `<url|text>`, `#` headers into
+  bold lines, and a Markdown table into a fenced code block, protecting existing code spans
+  and fences first.
+- **A first-party Slack connector** — the claude.ai one a Claude Code session or a fired
+  Routine holds, named `mcp__Slack__slack_send_message` (capital S, unlike the router's
+  `mcp__slack__*`); it will not appear in this repo's config — also converts standard
+  Markdown. Verified 2026-09-04 by posting and reading the message back: `**bold**` came back
+  stored as `*bold*`, `-` bullets became `•`, and the connector appended its own footer.
+
+So: `**bold**`, `_italic_`, `[text](url)`, `#` headings and Markdown tables are all fine, on
+both paths. Writing `*bold*` by hand is not an error — the conversion leaves it alone — but it
+is unnecessary, and on the connector a lone `*word*` renders as _italic_, which is the trap.
+
+What still needs care, because no converter fixes it:
+
+- **Keep messages short.** Slack tolerates a paragraph or two per turn, not a multi-page
+  artifact. For anything long, produce a doc or ticket and link to it. The router splits a
+  reply over ~4 000 characters into numbered parts, which is a worse read than a link.
+- **Tables convert to a code fence**, which does not wrap. A wide table becomes a horizontal
+  scroll. Prefer a short bulleted list of key–value pairs when the data is narrow enough.
+- **Mentions stay raw.** Write the `<@USER_ID>` token exactly as it arrived in the trigger —
+  `<@U0123ABCDEF>` — and Slack renders it as a clickable name. Do not rewrite it to `@handle`
+  or paraphrase it in prose.
+- **Don't open with a self-mention.** The thread already carries the context and the app label
+  shows who is speaking.
 
 Linear and GitHub tolerate standard Markdown; the rules above apply only when the medium is Slack.
 

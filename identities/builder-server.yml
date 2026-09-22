@@ -43,6 +43,9 @@ routing:
   linear_labels:
     - backend                                     # default backend skill
     - api                                         # contract-design skill
+    - needs-contract                              # contract-design skill — the flag Strategist `pm` sets on a
+                                                  # PRD with an API boundary (PROTOCOLS.md §1). Named by §1 and §5
+                                                  # since they were written; it routed nowhere until 2026-09-10.
     - ai                                          # ai-specialist skill
     - data-engineer                               # data-engineer skill (analytics instrumentation, ETL)
     - migration                                   # backend skill, migration-specific
