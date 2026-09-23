@@ -1,0 +1,121 @@
+name: pr-provenance
+
+# Every PR says which agent persona opened it. Per HAR-16: the work is done by Claude
+# sessions wearing a persona, all under one human GitHub account, so the author field
+# carries no provenance and reconstructing it means reading the diff.
+#
+# DELIBERATELY NO `paths` FILTER. This is the one guard that must run on every PR, and
+# a path-filtered workflow is not reliable enough to carry it: on dev-team#60's first
+# push neither ci.yml nor fleet-config.yml produced a run at all despite the diff
+# touching `router/**`, and nothing reported that they had not. A provenance check that
+# silently does not run is worse than none, because its absence reads as a pass.
+#
+# THE CHECKER RUNS FROM THE BASE BRANCH, NOT THE PR. Raised by Copilot on #62: this
+# workflow checks out the PR and would have executed the PR's own copy of the checker,
+# so a PR could edit the script, `package.json`, or an install hook and make its own
+# required gate pass. The PR tree is used for exactly one thing — reading commit
+# messages with `git log`, which is data, not code.
+#
+# `pull_request_target`, NOT `pull_request`, and that is the whole point. Under
+# `pull_request` GitHub evaluates the workflow DEFINITION from the PR branch, so a PR
+# could keep the `provenance` job name — satisfying a required status check — while
+# gutting its steps to succeed unconditionally. Copilot raised exactly that on #62,
+# against an earlier version of this file whose comment claimed a required status check
+# closed the hole. It does not. `pull_request_target` reads this file from the BASE
+# branch, so a PR cannot edit the gate it must pass.
+#
+# THE STANDARD `pull_request_target` FOOTGUN IS NOT PRESENT HERE: it runs with a
+# write-capable token against base-branch code, so checking out and EXECUTING PR code
+# under it is a repository-takeover bug. This workflow never executes PR code. The PR
+# tree is checked out to `pr/` and used for exactly one command — `git log`, reading
+# commit messages as data — and `permissions:` is narrowed to `contents: read`.
+#
+# Still worth doing in repo settings, as defence in depth rather than the fix: mark
+# `provenance` a required status check on a protected `main`. That is the owner's
+# action and is NOT done by merging this PR.
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-provenance-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # 1. The PR tree — read only for its commit messages, never executed.
+      #    `ref:` is REQUIRED here: under `pull_request_target` actions/checkout
+      #    defaults to the BASE ref, so without it this clone holds base history, the
+      #    `git log BASE..HEAD` below finds no HEAD object, and the commit-message
+      #    fallback silently stops working. (Copilot, #62 — a regression introduced by
+      #    the switch to pull_request_target itself.)
+      - name: Check out the PR head (data only)
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/head
+          path: pr
+          fetch-depth: 0
+
+      # 2. The base branch — the code that actually runs.
+      - name: Check out the base branch (trusted)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Matches ci.yml, fleet-config.yml and `corepack prepare pnpm@…` in
+          # deploy/Dockerfile. Pinned in all four; bump them together.
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the `node:20.10.0-bookworm-slim` base image in deploy/Dockerfile.
+          node-version: 20.10.0
+          cache: pnpm
+          cache-dependency-path: trusted/router/pnpm-lock.yaml
+
+      - name: Collect the PR's commit messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        # Written to a file rather than $GITHUB_OUTPUT. Raised by Copilot on #62: a
+        # fixed heredoc delimiter is attacker-controlled input away from being closed
+        # early by a commit message containing that same line. A file has no delimiter.
+        # No `|| true`. Masking a failed log leaves an empty file, which reads to the
+        # checker as "no trailer in the commits" — a false negative dressed as a real
+        # one. If the range cannot be read, that is a broken gate and should say so.
+        run: |
+          set -euo pipefail
+          git -C pr log --format=%B "${BASE_SHA}..${HEAD_SHA}" > "${RUNNER_TEMP}/pr-commits.txt"
+          echo "collected $(wc -l < "${RUNNER_TEMP}/pr-commits.txt") lines of commit message"
+
+      # The base branch must carry the checker. Under `pull_request_target` this file
+      # comes from base too, so if base has the workflow it has the script — the only
+      # way here is someone deleting one and not the other, which should be loud.
+      - name: Require a trusted checker
+        id: checker
+        run: |
+          if [ ! -f trusted/router/scripts/check-pr-provenance.ts ]; then
+            echo "::error::Base branch has no scripts/check-pr-provenance.ts. Refusing to run a PR-supplied checker against its own gate."
+            exit 1
+          fi
+          echo "dir=trusted/router" >> "$GITHUB_OUTPUT"
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: ${{ steps.checker.outputs.dir }}
+
+      - name: Check provenance
+        working-directory: ${{ steps.checker.outputs.dir }}
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_COMMITS_FILE: ${{ runner.temp }}/pr-commits.txt
+        run: pnpm exec tsx scripts/check-pr-provenance.ts

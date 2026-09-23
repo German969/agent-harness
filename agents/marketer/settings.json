@@ -402,7 +402,7 @@
         "message_template": "[marketer] ${SKILL}: ${DRAFT_TITLE}",
         "create_pr": true,
         "pr_label": "agent:marketer-bot",
-        "pr_body_template": "Draft content from `@marketer-agent` ${SKILL} skill.\n\n**Status**: DRAFT — awaiting human review + publish.\n**Brief**: ${BRIEF_LINK}\n**Brand voice review**: ${BRAND_REVIEW_STATUS}\n\nReviewing humans: please review the draft, request changes if needed, and merge to land in the content repo. **The merge does NOT publish externally** — a separate human-driven step is needed to push from content repo to the live CMS/email/social platforms."
+        "pr_body_template": "Draft content from `@marketer-agent` ${SKILL} skill.\n\n**Status**: DRAFT — awaiting human review + publish.\n**Brief**: ${BRIEF_LINK}\n**Brand voice review**: ${BRAND_REVIEW_STATUS}\n\nReviewing humans: please review the draft, request changes if needed, and merge to land in the content repo. **The merge does NOT publish externally** — a separate human-driven step is needed to push from content repo to the live CMS/email/social platforms.\n\nAgent: marketer"
       }
     ]
   },

@@ -369,6 +369,7 @@
           "agents/guardian/perf-sensitive-paths.yml"
         ],
         "message_template": "[guardian] update sensitive-paths registry — ${REASON}",
+        "pr_body_template": "Opened automatically by the router's SessionEnd hook.\n\nAgent: guardian",
         "create_pr": true,
         "pr_label": "agent:guardian-bot"
       }

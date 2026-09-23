@@ -342,6 +342,7 @@
           "assets/screenshots/**"
         ],
         "message_template": "[client-bot] screenshots — ${SCREENSHOT_REASON}",
+        "pr_body_template": "Screenshots committed by the router's SessionEnd hook.\n\nAgent: builder-client",
         "create_pr": true,
         "pr_label": "agent:client-bot"
       }

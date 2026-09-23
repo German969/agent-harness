@@ -942,6 +942,32 @@ The Harness agent is the only one that mutates the `dev-team/` repo — agent pr
 
 It applies to every PR Harness opens. It also applies (by convention) to humans who edit `dev-team/` directly during bootstrap — same standards.
 
+### Every PR names the persona that opened it
+
+**Put `Agent: <persona>` on its own line** in the PR body, a commit message, or both —
+`Agent: human` when a person wrote it directly. In `dev-team` the `pr-provenance`
+workflow **fails** a PR without it.
+
+This applies to every path that opens a PR, not just the SessionEnd `create_pr` hooks
+(which carry it in their `pr_body_template`). An agent calling
+`mcp__github__create_pull_request` directly must include it itself — that is the path
+most likely to forget, and the gate cannot tell the difference.
+
+Where to put it:
+
+- **A commit message** is the placement that reaches `main` and stays greppable. Whether
+  a PR body survives a squash depends on the repo's merge settings and on what the
+  merger types.
+- **The PR body** is the review-time record and what the check reads first. It is also
+  the copy you can correct without a force-push.
+
+Why a trailer and not an `agent:<name>` label: `classifier.ts` resolves a PR's ROUTER
+owner by stripping `agent:` off a label and looking the rest up in the identity
+registry, so `agent:guardian` on a session PR would resolve as a router fan-out target.
+The trailer shares no namespace with that lookup. The persona is also not the bot —
+`Agent: guardian` means a session wearing the Guardian persona, not the GitHub App
+`identities/guardian.yml` names. See HAR-16.
+
 ### The PR description template (canonical)
 
 Every Harness PR follows this shape. It's enforced by the `harness` PR template referenced in `agents/harness/settings.json` SessionEnd hook:

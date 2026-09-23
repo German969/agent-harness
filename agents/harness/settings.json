@@ -281,6 +281,7 @@
         "repo": "dev-team",
         "paths": ["**"],
         "message_template": "[harness] ${SKILL}: ${SUMMARY}",
+        "pr_body_template": "Opened automatically by the router's SessionEnd hook.\n\nAgent: harness",
         "create_pr": true,
         "pr_labels": [
           "agent:harness-bot"
