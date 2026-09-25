@@ -1008,13 +1008,13 @@ The `Cross-impact` section is **non-negotiable**. The most common harness mistak
 
 ### Auto-applied PR labels
 
-The router applies labels at PR-open time based on the diff (per `agents/harness/settings.json` SessionEnd hook):
+The router applies labels at PR-open time based on the diff (per `agents/harness/settings.json` SessionEnd hook; `computeLabels` in `git_commit_if_changed.ts`). Only PRs the **router** opens get them — a session PR opened through the GitHub MCP gets none, and carries its `Agent:` trailer instead:
 
 | Condition | Label | Review implication |
 |---|---|---|
 | Always | `agent:harness-bot` | Identifies the PR's author |
 | Diff touches `agents/harness/**` | `meta-self-modify` | Two-reviewer convention applies |
-| Diff touches `router/src/**` | `router-change` | Reviewer also verifies `router/ARCHITECTURE.md` was updated; merge triggers router rebuild + redeploy |
+| Diff touches `router/**`, `deploy/**` or `identities/*.yml` | `router-change` | Reviewer also verifies `router/ARCHITECTURE.md` was updated; nothing is live until a manual deploy (`deploy.yml` is `workflow_dispatch`-only since #61) |
 | Diff touches files belonging to 2+ agents | `cross-agent` | Reviewer verifies the Cross-impact section is complete |
 | Session activated `misbehavior-debugger` skill | `urgent` | Time-sensitive review; investigate the linked session_id |
 

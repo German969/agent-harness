@@ -11,6 +11,8 @@ import {
   resolveRepoPath,
 } from '../../src/hooks/commands/git_commit.js';
 import {
+  agentsTouched,
+  changedPathsForPr,
   computeLabels,
   gitCommitIfChangedHandler,
 } from '../../src/hooks/commands/git_commit_if_changed.js';
@@ -371,6 +373,88 @@ describe('git_commit_if_changed', () => {
         { skill: 'qa' },
       ),
     ).toEqual(['a']);
+  });
+
+  // HAR-13: the three path-based rules Harness declares were applied by nothing until
+  // now. These use Harness's real rule set, not a toy one.
+  const harnessRules = {
+    pr_labels: ['agent:harness-bot'],
+    auto_apply_conditional_labels: {
+      'agents/harness/**': 'meta-self-modify',
+      'router/**': 'router-change',
+      'deploy/**': 'router-change',
+      'identities/*.yml': 'router-change',
+      _multiple_agents: 'cross-agent',
+      _misbehavior_debugger: 'urgent',
+    },
+  };
+
+  it('applies a path rule when any changed path matches its glob', () => {
+    expect(computeLabels(harnessRules, {}, ['agents/harness/CLAUDE.md'])).toEqual([
+      'agent:harness-bot',
+      'meta-self-modify',
+    ]);
+    // router-change marks what is live only after a manual deploy: router code (tests
+    // and scripts included), compose, and identity files, which are read once at boot.
+    for (const path of [
+      'router/src/app.ts',
+      'router/tests/x.test.ts',
+      'router/scripts/v.ts',
+      'deploy/docker-compose.yml',
+      'identities/guardian.yml',
+    ]) {
+      expect(computeLabels(harnessRules, {}, [path]), path).toContain('router-change');
+    }
+    expect(computeLabels(harnessRules, {}, ['identities/README.md'])).not.toContain(
+      'router-change',
+    );
+    expect(computeLabels(harnessRules, {}, ['docs/router.md'])).toEqual(['agent:harness-bot']);
+  });
+
+  it('applies cross-agent only when two or more agent directories change', () => {
+    expect(
+      computeLabels(harnessRules, {}, ['agents/guardian/a.md', 'agents/guardian/b.md']),
+    ).toEqual(['agent:harness-bot']);
+    expect(
+      computeLabels(harnessRules, {}, [
+        'agents/guardian/settings.json',
+        'agents/marketer/CLAUDE.md',
+      ]),
+    ).toContain('cross-agent');
+    // PROTOCOLS.md sits directly under agents/ and belongs to no single agent.
+    expect(agentsTouched(['agents/PROTOCOLS.md', 'agents/guardian/x.md'])).toEqual(
+      new Set(['guardian']),
+    );
+  });
+
+  it('skips path rules, but not the skill rule, when the diff could not be read', () => {
+    expect(computeLabels(harnessRules, { skill: 'misbehavior-debugger' }, undefined)).toEqual([
+      'agent:harness-bot',
+      'urgent',
+    ]);
+  });
+
+  it('ignores an unknown _-condition rather than guessing', () => {
+    expect(
+      computeLabels({ auto_apply_conditional_labels: { _someday: 'x' } }, {}, ['anything']),
+    ).toEqual([]);
+  });
+
+  it('reads the PR diff against the base branch (three-dot, like GitHub)', async () => {
+    git(devTeam, ['checkout', '-q', '-b', 'feature']);
+    mkdirSync(join(devTeam, 'agents', 'harness'), { recursive: true });
+    writeFileSync(join(devTeam, 'agents', 'harness', 'CLAUDE.md'), 'x\n');
+    git(devTeam, ['add', '.']);
+    git(devTeam, ['commit', '-m', 'feature change']);
+    // A later commit on main must NOT show up as part of the PR.
+    git(devTeam, ['checkout', '-q', 'main']);
+    writeFileSync(join(devTeam, 'on-main.txt'), 'y\n');
+    git(devTeam, ['add', '.']);
+    git(devTeam, ['commit', '-m', 'main moves on']);
+    git(devTeam, ['checkout', '-q', 'feature']);
+
+    expect(await changedPathsForPr(devTeam, 'main')).toEqual(['agents/harness/CLAUDE.md']);
+    expect(await changedPathsForPr(devTeam, 'no-such-branch')).toBeUndefined();
   });
 
   it('no-ops when nothing changed', async () => {

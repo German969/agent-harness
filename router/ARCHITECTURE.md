@@ -1401,15 +1401,21 @@ If a single layer were modified, the others still catch the bypass. Changes to a
 
 ### Auto-applied PR labels
 
-When Harness's SessionEnd creates a PR, the router auto-applies labels based on the diff (per `auto_apply_conditional_labels` in `settings.json`):
+When Harness's SessionEnd creates a PR, the router auto-applies labels based on the diff (per `auto_apply_conditional_labels` in `settings.json`; `computeLabels` in `git_commit_if_changed.ts`). The diff is `git diff --name-only <base>...HEAD`, the same three-dot range GitHub shows as the PR's files:
 
 | Condition | Label |
 |---|---|
 | Always | `agent:harness-bot` |
 | Diff touches `agents/harness/**` | `meta-self-modify` |
-| Diff touches `router/src/**` | `router-change` |
-| Diff touches files belonging to 2+ agents | `cross-agent` |
+| Diff touches `router/**`, `deploy/**` or `identities/*.yml`: what `deploy.yml` says waits for a manual deploy (identities have no reload path) | `router-change` |
+| Diff touches two or more `agents/<name>/` directories (`agents/PROTOCOLS.md` and other top-level files count for no one) | `cross-agent` |
 | Session activated `misbehavior-debugger` skill | `urgent` |
+
+Until HAR-13 only the last row was implemented, and the three path rows were applied by nothing. If the base branch can't be diffed, the path rows are skipped with a warning rather than guessed. `router-change` used to say `router/src/**`. Since #61, `deploy.yml` is manual-only (`workflow_dispatch`), so the label no longer means "merging redeploys". It means **the change does nothing live until someone runs a deploy**. That covers router code, compose, and identity edits, which are read once at boot.
+
+The `agent:harness-bot` owner label resolves to Harness through `ownerFromLabel` in `routing/classifier.ts`. That function accepts an `agent:<name>` label naming either the agent id or its `linear.agent_handle`. Before HAR-13 it knew only bare ids, so none of the handle-form owner labels the agents' hooks apply ever resolved.
+
+These labels only reach a PR the **router** opens. A PR opened from a Claude Code web session goes through the GitHub MCP and gets no hook labels at all. Its provenance is the `Agent: <persona>` trailer (PROTOCOLS.md §7).
 
 Labels signal to human reviewers what kind of scrutiny the PR deserves. `meta-self-modify` carries a two-reviewer convention; `router-change` requires the reviewer to also verify `router/ARCHITECTURE.md` was updated.
 

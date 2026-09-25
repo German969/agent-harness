@@ -288,7 +288,9 @@
         ],
         "auto_apply_conditional_labels": {
           "agents/harness/**": "meta-self-modify",
-          "router/src/**": "router-change",
+          "router/**": "router-change",
+          "deploy/**": "router-change",
+          "identities/*.yml": "router-change",
           "_multiple_agents": "cross-agent",
           "_misbehavior_debugger": "urgent"
         }

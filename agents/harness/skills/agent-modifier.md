@@ -65,7 +65,7 @@ description: Modify an existing agent based on a human request — "Builder-Serv
 10. **Auto-apply labels** per the SessionEnd hook's `auto_apply_conditional_labels` rules:
     - `agent:harness-bot` (always)
     - `meta-self-modify` if paths in `agents/harness/**` (rare — this skill mostly modifies other agents)
-    - `router-change` if paths in `router/src/**` (means you escalated to router-engineer)
+    - `router-change` if paths in `router/**`, `deploy/**` or `identities/*.yml` — changes that are live only after a manual deploy (auto-applied by the SessionEnd hook when the router opens the PR)
     - `cross-agent` if files for 2+ agents
 
 11. **Post a Slack notification** to `#harness-engineering` with the PR link + a one-line summary.
@@ -85,7 +85,7 @@ description: Modify an existing agent based on a human request — "Builder-Serv
 PR labels (auto-applied per SessionEnd hook):
 - `agent:harness-bot` (always)
 - `meta-self-modify` if `agents/harness/**` touched
-- `router-change` if `router/src/**` touched (you'd have escalated to router-engineer)
+- `router-change` if `router/**`, `deploy/**` or `identities/*.yml` touched — live only after a manual deploy
 - `cross-agent` if 2+ agents touched
 
 Per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol), tickets that trigger this skill should carry `agent-improvement` + a sub-area label (e.g. `prompt-tweak`, `new-tool`, `new-skill-section`).

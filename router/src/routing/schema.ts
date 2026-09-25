@@ -17,8 +17,11 @@ export const GithubIdentitySchema = z.object({
   bot_username: z.string(),
   installation_url: nullableString,
   installations: z.record(z.string(), z.union([z.number(), z.string(), z.null()])).optional(),
-  default_pr_labels: z.array(z.string()).optional(),
-  conditional_pr_labels: z.array(z.object({ label: z.string(), condition: z.string() })).optional(),
+  // `default_pr_labels` / `conditional_pr_labels` used to sit here. Nothing read them:
+  // the labels a PR gets come from the create_pr hook in agents/<agent>/settings.json
+  // (`pr_labels` + `auto_apply_conditional_labels`). Only Harness filled them in, and
+  // its copy had already drifted (`router/src/**` where the hook now says `router/**`).
+  // Removed in HAR-13 so there is one declaration to keep right, not two.
 });
 
 export const LinearIdentitySchema = z.object({

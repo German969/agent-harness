@@ -41,7 +41,9 @@ export { type MatchReason, isWorkTrigger };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** PR-owner label convention: a `agent:<name>` label designates the owner agent. */
+/** PR-owner label convention: an `agent:<name>` label designates the owner agent.
+ *  `<name>` is the agent id (`agent:guardian`) or its Linear `agent_handle`
+ *  (`agent:guardian-bot`) — see `ownerFromLabel`. */
 const OWNER_LABEL_PREFIX = 'agent:';
 
 export type ClassifyDeps = {
@@ -233,14 +235,35 @@ function isGithubPrEvent(event: WebhookEvent): boolean {
 function resolvePrOwner(reg: Registry, event: WebhookEvent): AgentId | undefined {
   const { labels, authorLogin } = githubPrMeta(event);
   for (const name of labels) {
-    if (name.startsWith(OWNER_LABEL_PREFIX)) {
-      const agent = name.slice(OWNER_LABEL_PREFIX.length).trim() as AgentId;
-      if (reg.byAgent.has(agent)) return agent;
-    }
+    const agent = ownerFromLabel(reg, name);
+    if (agent) return agent;
   }
   if (authorLogin) {
     const opener = agentFromBotLogin(reg, authorLogin);
     if (opener) return opener;
+  }
+  return undefined;
+}
+
+/**
+ * The agent an `agent:<name>` label names, if any.
+ *
+ * Accepts the bare agent id AND the agent's `linear.agent_handle`, because the labels
+ * the agents' own PR hooks apply are the handle form — `agent:harness-bot`,
+ * `agent:guardian-bot`, `agent:client-bot` — and until HAR-13 not one of them
+ * resolved: the lookup only knew bare ids, so every configured owner label was
+ * silently ignored and routing fell through to the App-author fallback.
+ *
+ * The handle is matched whole rather than by stripping `-bot`: Builder-Client's
+ * handle is `client-bot`, and stripping gives `client`, which is not an agent.
+ */
+export function ownerFromLabel(reg: Registry, label: string): AgentId | undefined {
+  if (!label.startsWith(OWNER_LABEL_PREFIX)) return undefined;
+  const name = label.slice(OWNER_LABEL_PREFIX.length).trim();
+  if (name === '') return undefined;
+  if (reg.byAgent.has(name as AgentId)) return name as AgentId;
+  for (const id of reg.identities) {
+    if (id.linear?.agent_handle === name) return id.agent;
   }
   return undefined;
 }

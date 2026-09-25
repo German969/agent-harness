@@ -11,6 +11,7 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { minimatch } from 'minimatch';
 import {
   type OpenPullRequestResult,
   PullRequestClient,
@@ -148,17 +149,20 @@ export const gitCommitIfChangedHandler: HookHandler = async (config, ctx): Promi
 };
 
 /**
- * Compute the effective set of PR labels. Starts with pr_labels, then applies
- * the auto_apply_conditional_labels rules (used by Harness's meta-self-modify /
- * router-change / cross-agent / urgent auto-labels).
+ * Compute the effective set of PR labels: `pr_labels` / `pr_label`, then every
+ * `auto_apply_conditional_labels` rule whose condition holds.
  *
  * The condition-key mini-DSL:
- *   - Path pattern (e.g. `agents/harness/**`) — applies label if any modified path matches
- *   - `_multiple_agents` — applies if diff touches ≥2 agents (impl in Phase 6d)
- *   - `_misbehavior_debugger` — applies if the active skill is misbehavior-debugger
+ *   - a path glob (e.g. `agents/harness/**`) — any changed path matches it
+ *   - `_multiple_agents` — the changed paths fall under two or more `agents/<name>/` dirs
+ *   - `_misbehavior_debugger` — the active skill is misbehavior-debugger
  *
- * Phase 6b implements the skill-based auto-label; path-based conditions land in
- * Phase 6d when we have access to the actual diff.
+ * Until HAR-13 only the last was implemented; the two path-based kinds waited on a
+ * "Phase 6d" that never came, so `meta-self-modify`, `router-change` and
+ * `cross-agent` were declared on Harness and applied by nothing. `changedPaths` is
+ * the PR's diff against its base (`changedPathsForPr`). When it is undefined — the
+ * diff could not be read — path conditions are skipped rather than guessed, and the
+ * caller logs that it happened.
  */
 export function computeLabels(
   cfg: {
@@ -167,15 +171,67 @@ export function computeLabels(
     auto_apply_conditional_labels?: Record<string, string>;
   },
   ctx: { skill?: string | undefined },
+  changedPaths?: readonly string[],
 ): string[] {
   const labels = new Set([...(cfg.pr_labels ?? []), ...(cfg.pr_label ? [cfg.pr_label] : [])]);
   const rules = cfg.auto_apply_conditional_labels ?? {};
 
-  if (ctx.skill === 'misbehavior-debugger' && rules._misbehavior_debugger) {
-    labels.add(rules._misbehavior_debugger);
+  for (const [condition, label] of Object.entries(rules)) {
+    if (conditionHolds(condition, ctx, changedPaths)) labels.add(label);
   }
 
   return [...labels];
+}
+
+function conditionHolds(
+  condition: string,
+  ctx: { skill?: string | undefined },
+  changedPaths: readonly string[] | undefined,
+): boolean {
+  if (condition === '_misbehavior_debugger') return ctx.skill === 'misbehavior-debugger';
+  if (changedPaths === undefined) return false;
+  if (condition === '_multiple_agents') return agentsTouched(changedPaths).size >= 2;
+  // Any other `_`-prefixed key is a condition this code does not know. Not matching
+  // it is the safe reading: a label applied on a guess is worse than one missing.
+  if (condition.startsWith('_')) return false;
+  return changedPaths.some((path) => minimatch(path, condition, { dot: true }));
+}
+
+/** The agents whose own directory a set of paths touches. `agents/PROTOCOLS.md` and
+ *  other files directly under `agents/` belong to no one agent and are not counted. */
+export function agentsTouched(paths: readonly string[]): Set<string> {
+  const agents = new Set<string>();
+  for (const path of paths) {
+    const parts = path.split('/');
+    if (parts[0] === 'agents' && parts.length >= 3 && parts[1]) agents.add(parts[1]);
+  }
+  return agents;
+}
+
+/**
+ * Paths the PR changes: `git diff --name-only <base>...HEAD`, the same three-dot
+ * range GitHub shows as the PR's files. Tries `origin/<base>` first, then a local
+ * `<base>`. Undefined when neither ref resolves — never a guess.
+ */
+export async function changedPathsForPr(
+  repoPath: string,
+  base: string,
+): Promise<string[] | undefined> {
+  for (const ref of [`origin/${base}`, base]) {
+    try {
+      const { stdout } = await execFileP('git', [
+        '-C',
+        repoPath,
+        'diff',
+        '--name-only',
+        `${ref}...HEAD`,
+      ]);
+      return stdout.split('\n').filter((line) => line !== '');
+    } catch {
+      // try the next ref
+    }
+  }
+  return undefined;
 }
 
 type PrOutcome = { ok: true; result: OpenPullRequestResult } | { ok: false; reason: string };
@@ -230,7 +286,17 @@ async function openPr(
     return await failPr(`could not read the repo's git refs: ${(err as Error).message}`, cfg, ctx);
   }
 
-  const labels = computeLabels(cfg, ctx);
+  const hasPathRules = Object.keys(cfg.auto_apply_conditional_labels ?? {}).some(
+    (condition) => condition !== '_misbehavior_debugger',
+  );
+  const changedPaths = hasPathRules ? await changedPathsForPr(repoPath, base) : [];
+  if (changedPaths === undefined) {
+    ctx.log.warn(
+      { repo: cfg.repo, base },
+      'git_commit_if_changed: could not diff against the base branch; path-based PR labels skipped',
+    );
+  }
+  const labels = computeLabels(cfg, ctx, changedPaths);
   const body = cfg.pr_body_template
     ? resolveVars(cfg.pr_body_template, contextVars(ctx))
     : undefined;

@@ -18,6 +18,7 @@ export { resolveSkill } from './skill.js';
 export {
   classify,
   isWorkTrigger,
+  ownerFromLabel,
   type Classification,
   type ClassifyDeps,
   type ContinuationDecision,

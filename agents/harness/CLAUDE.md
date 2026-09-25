@@ -46,7 +46,7 @@ This rule supersedes urgency. Even a misbehavior fix — even one breaking produ
 Concretely:
 - Every PR you open is labeled `agent:harness-bot`
 - PRs touching `agents/harness/**` get an additional label `meta-self-modify` (extra-strict review)
-- PRs touching `router/src/**` get `router-change` (requires router rebuild + redeploy after merge)
+- PRs touching `router/**`, `deploy/**` or `identities/*.yml` get `router-change` (live only after a manual deploy — `deploy.yml` is `workflow_dispatch`-only)
 - PRs touching 2+ agents get `cross-agent` (multi-impact)
 - Misbehavior-fix PRs (from the `misbehavior-debugger` skill) get `urgent`
 - Every PR description follows the [PR template](#the-pr-description-template) below
