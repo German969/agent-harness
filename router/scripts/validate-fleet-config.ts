@@ -33,6 +33,9 @@
 //      all seven with no config mentioning it: the write path open, the read path
 //      absent. Dropping the index from a load hook would silently restore that,
 //      and no test or session would fail.
+//   8. The GitHub PR label registry (agents/github-pr-labels.yml) and the agents'
+//      create_pr hooks agree in both directions. Whether the labels exist on GitHub
+//      needs a token, so that half runs in the github-labels workflow instead.
 //
 // Exits non-zero listing every problem found, rather than stopping at the first:
 // fixing config one CI run at a time is how a five-minute edit becomes an hour.
@@ -49,6 +52,12 @@ import {
 } from '../src/hooks/registry.js';
 import type { GlobRegistrySpec } from '../src/config/globRegistry.js';
 import { validateGlobRegistryFile } from '../src/config/globRegistry.js';
+import {
+  REGISTRY_PATH,
+  crossCheckLabels,
+  declaredPrLabels,
+  parseLabelRegistry,
+} from '../src/config/prLabels.js';
 import { loadIdentities } from '../src/routing/loader.js';
 import { resolvableSkills } from '../src/routing/skill.js';
 import { auditFleetModels } from '../src/runtime/modelCheck.js';
@@ -399,6 +408,34 @@ for (const agent of agents) {
   }
 }
 
+// 8 — the PR label registry and the hooks that apply the labels agree (HAR-13).
+//     Until HAR-13 six labels were applied by hooks and existed nowhere; the registry
+//     is what lets the github-labels workflow create and check them.
+{
+  const settingsByAgent = new Map<string, unknown>();
+  for (const agent of agents) {
+    try {
+      settingsByAgent.set(
+        agent,
+        JSON.parse(readFileSync(join(repoRoot, 'agents', agent, 'settings.json'), 'utf-8')),
+      );
+    } catch {
+      // already reported by check 1
+    }
+  }
+  let registryText: string | undefined;
+  try {
+    registryText = readFileSync(join(repoRoot, REGISTRY_PATH), 'utf-8');
+  } catch (err) {
+    problems.push(`${REGISTRY_PATH}: could not read — ${(err as Error).message}`);
+  }
+  if (registryText !== undefined) {
+    const { registry, problems: shape } = parseLabelRegistry(registryText);
+    problems.push(...shape);
+    if (registry) problems.push(...crossCheckLabels(declaredPrLabels(settingsByAgent), registry));
+  }
+}
+
 // 5 — every skill the router can resolve for an agent has a file to deliver.
 //     Before the session was handed its skill's markdown this was cosmetic; now a
 //     missing file means the agent runs the trigger with no procedure at all.
@@ -420,5 +457,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, both guardian glob registries well-formed`,
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, both guardian glob registries well-formed, PR label registry matches the hooks`,
 );

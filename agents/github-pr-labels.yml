@@ -1,0 +1,49 @@
+# GitHub PR labels the agents' create_pr hooks apply, with what the hooks cannot say:
+# a description and a colour for each (HAR-13).
+#
+# The hooks in agents/<agent>/settings.json decide WHICH labels a PR gets
+# (`pr_labels`, `pr_label`, `auto_apply_conditional_labels`). This file only
+# describes them. validate:fleet fails when the two disagree in either direction:
+# a label a hook applies that is not listed here, or one listed here that no hook
+# applies. Add or remove both together.
+#
+# The github-labels workflow checks that every label under `dev-team` exists on the
+# repo (push to main, weekly, or by hand), and creates the missing ones when run by
+# hand with mode=create. It never edits or deletes an existing label, because one
+# may already be on live PRs.
+#
+# `<target-project>-marketing` is still a placeholder in the Builder-Client and
+# Marketer hooks. Its labels are listed so the hooks and this file agree, but there
+# is no such repo to create them on until a real one is named.
+#
+# GitHub's limits: `color` is 6 hex digits without '#' (quoted, or YAML may read
+# an all-digit colour as a number), and `description` is at most 100 characters.
+
+version: 1
+repos:
+  dev-team:
+    "agent:harness-bot":
+      color: "5319e7"
+      description: "Owner: Harness. Routes this PR's events to Harness (ownerFromLabel)."
+    "agent:guardian-bot":
+      color: "1d76db"
+      description: "Owner: Guardian. Routes this PR's events to Guardian (ownerFromLabel)."
+    meta-self-modify:
+      color: "d93f0b"
+      description: "Changes Harness's own config (agents/harness/**). Two-reviewer convention."
+    router-change:
+      color: "0e8a16"
+      description: "Router code, deploy/ or identities changed: live only after a manual deploy."
+    cross-agent:
+      color: "fbca04"
+      description: "Changes files belonging to two or more agents."
+    urgent:
+      color: "b60205"
+      description: "Opened from a misbehavior-debugger session."
+  "<target-project>-marketing":
+    "agent:client-bot":
+      color: "c5def5"
+      description: "Owner: Builder-Client. Routes this PR's events to Builder-Client."
+    "agent:marketer-bot":
+      color: "f9d0c4"
+      description: "Owner: Marketer. Routes this PR's events to Marketer."

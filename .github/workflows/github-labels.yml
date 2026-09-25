@@ -1,0 +1,100 @@
+name: github-labels
+
+# Do the PR labels the agents apply actually exist on this repo? (HAR-13)
+#
+# The labels come from each agent's create_pr hook; agents/github-pr-labels.yml
+# describes them. validate:fleet (fleet-config.yml) checks that the two agree,
+# offline, on every PR. This workflow does the half that needs a token: asking
+# GitHub whether the labels are there.
+#
+# Deliberately NOT on pull_request. A PR that adds a label to the registry is red
+# until the label exists, and it can only be created after the registry change
+# merges, so a PR-time check would fail by construction. The check runs on push to
+# main (when the registry or the check itself changes), weekly (labels can be
+# deleted in the UI at any time), and by hand.
+#
+# `mode=create` (manual, from main only) creates the missing labels from the
+# registry, then re-lists them. It never edits or deletes an existing label. It is the only job
+# with write permission.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agents/github-pr-labels.yml'
+      - 'router/src/config/prLabels.ts'
+      - 'router/scripts/github-labels.ts'
+      - '.github/workflows/github-labels.yml'
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check (report missing labels) or create (add the missing ones)'
+        type: choice
+        options: [check, create]
+        default: check
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-labels
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'check'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.10.0
+          cache: pnpm
+          cache-dependency-path: router/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: router
+      - name: check the labels exist
+        run: pnpm labels:github
+        working-directory: router
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create:
+    # Only from main. workflow_dispatch runs the workflow file and checks out the code
+    # of whatever ref is selected, so without this a branch could run its own registry
+    # and script with `issues: write`. Anyone able to dispatch already has write access
+    # to the repo, so this is a guard against running unreviewed code by accident, not a
+    # boundary against a malicious collaborator; a required-reviewer environment on this
+    # job would be that, and is the owner's call.
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'create' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.10.0
+          cache: pnpm
+          cache-dependency-path: router/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: router
+      - name: create the missing labels, then re-check
+        run: pnpm labels:github --create
+        working-directory: router
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
