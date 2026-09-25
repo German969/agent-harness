@@ -7,13 +7,13 @@ description: Software architecture — writes ADRs (Architecture Decision Record
 
 ## Activate when
 
-- PR opened that matches `dev-team-state/projects/<project>/platform/arch-review-paths.yml` (architecturally significant — touches service boundaries, adds a dependency, changes a cross-cutting pattern). Not wired today: `github_auto_triggers: []`, and the file does not exist
+- **Every PR opened** on the project repo. `dev-team-state/projects/<project>/platform/arch-review-paths.yml` sets the **depth** — deep when a path matches a `patterns` glob or the change trips a `shape` rule, light otherwise — not whether to review. Runs today as a claude.ai Routine (`dev-team-state/projects/<project>/platform/routines/pr-review.md`); the router path stays unwired by design (`github_auto_triggers: []`, see `CLAUDE.md` Mode A)
 - `@platform-agent` mention requesting an ADR or design opinion
 - Linear ticket labeled `architecture`
 - **Contract design request** during planning (review a proposed contract for cross-service consistency, per the [API Contract Protocol](../../PROTOCOLS.md#contract-design-during-planning))
 - **CCP tiebreak** when Builder-Server and Builder-Client disagree on a contract change
 
-**Do not activate** if `<target-project>/founding/STACK.md` doesn't exist — refuse and recommend Phase 0 first. ADRs without stack context are unanchored.
+**Do not activate** if `<target-project>/founding/STACK.md` doesn't exist — refuse and recommend Phase 0 first. ADRs without stack context are unanchored. On a PR, refusing still means commenting: post the one review comment saying no architecture review ran because `founding/STACK.md` is missing (Mode A: a run that posts nothing is indistinguishable from one that never fired).
 
 ## Specialized knowledge
 

@@ -55,7 +55,7 @@ work left is picking vendors and wiring the servers, not editing the config. Thi
 same fault the vault already records for both Builders and Linear — see
 `dev-team-state/shared/process/external-tools.md`.
 
-**`arch-review-paths.yml` was specified in two places and exists in neither.** SPEC §5.1
+**`arch-review-paths.yml` was specified in two places and, until 2026-09-18, existed in neither.** SPEC §5.1
 put it in `agents/platform/`; SPEC §6's project-scoped tree put it in
 `dev-team-state/projects/<project>/platform/`. `CLAUDE.md` and `skills/architect.md`
 named it with no path at all.
@@ -65,10 +65,13 @@ architecturally significant path in one codebase is noise in another — and the
 naturally beside `dependency-graph.md` and `active-refactors.md`, which Platform already
 writes as project state. All four references now agree.
 
-Still not created, deliberately. `identities/platform.yml` sets
-`github_auto_triggers: []`, so no PR ever opens Platform, and nothing reads the file.
-Creating it now would be a stub with no consumer. It becomes real work the same day the
-PR trigger is wired.
+**Created 2026-09-18, consumed since 2026-09-23.** It lives at
+`dev-team-state/projects/iris/platform/arch-review-paths.yml`. An earlier version of this
+paragraph said it was deliberately not created, because `identities/platform.yml` sets
+`github_auto_triggers: []` and so no PR ever opens Platform — which is still true, and is
+still correct. What reads the file is a claude.ai Routine outside the router
+(`dev-team-state/projects/iris/platform/routines/pr-review.md`), which reviews every PR in
+the project repo and uses the file to pick deep or light depth. See `CLAUDE.md` Mode A.
 
 ## Smaller drift
 
