@@ -10,6 +10,9 @@ Protocols defined here:
 4. [Product Screenshot Protocol](#4-product-screenshot-protocol) — how Marketer gets product screenshots for content (Builder-Client produces; Marketer consumes from a maintained library).
 5. [Linear Labels Protocol](#5-linear-labels-protocol) — the canonical label registry, who adds each label and when, the triage backstop, conflict resolution.
 6. [Token / Cost Resilience Protocol](#6-token--cost-resilience-protocol) — how the fleet handles the five distinct "out of tokens" scenarios; spend caps; the session-incomplete marker for resuming interrupted work.
+7. [Harness Change Protocol](#7-harness-change-protocol) — how changes to this repo are proposed, described and reviewed.
+8. [Fleet Memory Protocol](#8-fleet-memory-protocol) — how `dev-team-state` is read and written as the fleet's memory.
+9. [PR Lifecycle Protocol](#9-pr-lifecycle-protocol) — every agent, every repo: sign the PR, read every review before merging, one Linear issue per PR.
 
 ---
 
@@ -968,6 +971,9 @@ The trailer shares no namespace with that lookup. The persona is also not the bo
 `Agent: guardian` means a session wearing the Guardian persona, not the GitHub App
 `identities/guardian.yml` names. See HAR-16.
 
+This subsection records why the gate exists in `dev-team`. The fleet-wide rule, for every
+repo whether or not a gate enforces it, is [§9](#9-pr-lifecycle-protocol).
+
 ### The PR description template (canonical)
 
 Every Harness PR follows this shape. It's enforced by the `harness` PR template referenced in `agents/harness/settings.json` SessionEnd hook:
@@ -1157,3 +1163,143 @@ again. Two things that actually happened, both verifiable in this repo's history
 - `shared/` has been committable by all seven agents since the tier was added, and not
   one agent config mentioned it. The write path was open and nothing told anyone the
   vault was there — which is what this protocol and the index injection fix together.
+
+---
+
+## 9. PR Lifecycle Protocol
+
+Every agent, every repo — `dev-team`, `dev-team-state`, the target project and its
+marketing repo — whether a CI gate enforces it there or not. Set by the fleet owner on
+2026-09-25. Three rules, each closing a failure that already happened.
+
+### 9.1 Sign every PR you open
+
+**Scope: every PR body and commit message a session writes itself** — through
+`mcp__github__create_pull_request`, `git commit`, or any other direct path. The router's
+SessionEnd hooks compose their own from `pr_body_template` / `message_template` in each
+agent's `settings.json`; those PR bodies already carry `Agent:`, and bringing the
+templates in line with the full signature below is a Harness change (HAR-20), not
+something a session does by hand.
+
+Every agent session opens PRs through the **same human GitHub account**, and the
+Routines post their reviews through it too. The author field therefore says nothing about
+which persona owns a PR. The signature is what tells the other agents — and the fleet
+owner — whose it is, who answers its review threads, and who drives it to merge.
+
+End the PR body with:
+
+```
+---
+Opened by the **<Persona>** agent.
+
+Agent: <persona>
+```
+
+- `<persona>` is one of `strategist`, `platform`, `builder-server`, `builder-client`,
+  `guardian`, `marketer`, `harness` — or `human` when a person wrote it directly.
+- The `Agent:` line is the same trailer §7 describes: on its own line, matched
+  case-insensitively by `dev-team`'s `pr-provenance` gate. Put it in your commit messages
+  too — that is what the gate reads when the body lacks it.
+- **After a squash merge, only the squash commit reaches `main`.** Its message is whatever
+  the merger submits — depending on repo settings GitHub pre-fills it from the PR title,
+  body or commit list, and any of that can be edited away. So **whoever merges puts the
+  `Agent:` line in the squash commit body**, alongside the §9.2 merge record. That copy is
+  the durable one.
+- **A signature, never a label — outside the router.** A session the router did not
+  start (a claude.ai session, a human-driven one) never adds an `agent:*` label: the
+  router's `classifier.ts` resolves a PR's owner from `agent:` labels, so on the owner's
+  account that label turns a session PR into a router routing target (§7, HAR-16). §5's
+  `agent:<bot>` attribution label is for **router-run** sessions, where routing that PR's
+  events to its owner is exactly the point; the labels the router's own hooks apply stay
+  as they are.
+- **Editing someone else's PR does not change its owner.** Add commits; leave the
+  signature alone. If ownership really moves, say so in a PR comment and change the
+  signature in the same edit.
+
+### 9.2 Before merging, read every review — all of them
+
+A green check is not a clean review. The Copilot check turns green when the review
+*ran*, whatever it found. The Routine reviews are ordinary PR comments with no check at
+all.
+
+Before merging a PR — only where your own blast radius already lets you merge; this rule
+grants no merge rights — read what each reviewer posted **on that PR**:
+
+| Reviewer | Where it lands | How to recognise it |
+|---|---|---|
+| **Copilot** | PR reviews **and** inline review threads | Author `copilot-pull-request-reviewer[bot]`. Read the review *body* too: its "Open", "Previously missed" and per-file notes are findings, and some never become an inline thread. |
+| **Guardian** (claude.ai Routine) | A PR conversation comment | Starts `## Guardian review`, ends `— Guardian`. The author is the fleet owner's account, not a bot. |
+| **Platform** (claude.ai Routine) | A PR conversation comment | Starts `## Platform review — architecture`; carries `<!-- platform-arch-review: <sha> -->`. The author is the fleet owner's account. |
+
+Then:
+
+1. **Every finding is fixed or answered.** Fixed means pushed. Answered means a reply
+   on that thread (or the review comment) saying why not. Resolve the threads you
+   addressed. There is no third state.
+2. **Re-request Copilot after every push that answers it**, and read the re-review. A
+   re-review regularly finds something new — on 2026-09-24 it did on both PRs it re-reviewed.
+3. **Know which head each review covered.** The Routines review the head they fired on;
+   Platform's marker names it. If you pushed since, say in the merge record whether the
+   new commits touch that reviewer's lane.
+4. **A reviewer that has not posted yet is a wait, not a pass** — where it runs on that
+   repo, and unless its own contract says it posts nothing for this PR. Guardian's
+   router-path tier table posts nothing on Skip and only findings on Light; the claude.ai
+   Guardian Routine comments on every tier. As of 2026-09-25 neither Routine has commented on a `dev-team` PR; there, Copilot
+   and CI are the reviewers, and the merge record says so.
+5. **CI green on the current head, and no merge conflict.**
+6. **Record it in the merge commit body** — one line per reviewer: what it found, and on
+   which head. Free, permanent, and greppable on `main`:
+
+   ```
+   Reviews: Copilot — 0 open (re-review on 3d753b6). Guardian — Light, 0 findings (9c7dd7b).
+   Platform — Light, no concerns (9c7dd7b). CI green on 778e838.
+
+   Agent: platform
+   ```
+
+### 9.3 One Linear issue per PR
+
+Linear's GitHub integration links a PR to an issue when the issue ID appears in the
+branch name, the PR title, or the body next to a closing word, and moves the issue to
+**Done** when that PR merges. A PR that names a multi-PR issue therefore closes it at the
+first merge. IRS-6 was closed that way on 2026-09-14 — two seconds after the first `[IRS-6]` PR
+merged — with three of its steps unbuilt; three more PRs then landed on an issue already
+marked Done.
+
+- **A PR that does Linear-tracked work closes exactly one issue**, named in its title:
+  `[IRS-83] …`. A PR with no Linear issue — fleet-config work often has none — names no
+  issue it does not close; that is the only exception.
+- **Work known to take more than one PR is split into sub-issues before the first PR
+  opens** — one per PR, parented to the original. Each PR names its sub-issue. If a
+  single PR only turns out to need a sequel while it is open, create the sub-issue,
+  retitle that PR to it **and** delete the parent's PR attachment in Linear — both
+  **before it merges**, so its merge cannot close the parent. (A branch named after the
+  parent cannot be renamed under an open PR; if that is how it is linked, open a new PR
+  from a new branch.)
+- **Name a parent only with a non-closing word** — `Part of IRS-6`, `Related to`, `Refs`.
+  Never `Closes` / `Fixes` / `Resolves` / `Completes` a parent, and never a parent's ID in
+  a title or a branch name.
+- **If you find a PR already linked to the parent:** retitle it to its sub-issue, and
+  delete the parent's PR attachment in Linear — retitling alone does not remove it.
+- **After reopening a parent, check its status again a few minutes later.** On
+  2026-09-25 IRS-6 was reopened at 12:52:22 and was back to Done at 12:54:07, with no
+  human change, while one of its linked PRs was being retitled. It had four merged PRs
+  attached. Reopen it again if it flipped, and say so on the issue.
+- **A step your tools cannot do is handed off, never skipped.** The router's Linear tier
+  has no delete tool, so a router session cannot remove an attachment itself: name the
+  attachment and the issue to the fleet owner, and hold the merge until it is gone. The
+  same goes for any §9 step your toolset lacks — re-requesting Copilot included.
+- **The parent closes when its last sub-issue does**, and whoever closes it checks the
+  parent's acceptance criteria rather than assuming the sub-issues covered them.
+
+### Why this protocol exists
+
+Each rule is a failure that happened, not a hypothetical:
+
+- **Ownership.** One GitHub account authors every agent's PRs and every Routine's
+  reviews. Without a signature, an agent reading a PR cannot tell whether it is its own
+  to drive, another agent's to leave alone, or a human's.
+- **Reviews.** On 2026-09-24 a PR's Copilot check was green while its review body held
+  a finding no inline thread showed; a re-review after the fix found a new one. The
+  Guardian and Platform Routine reviews have no check at all — skipping them is silent.
+- **Linear.** IRS-6, above.
