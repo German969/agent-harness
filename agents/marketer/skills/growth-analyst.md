@@ -87,7 +87,7 @@ Document in `campaigns/<slug>/retro.md` (paired with Campaign Lead's strategic r
 ## Label conventions
 
 When creating tickets per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
-- Type: `research` or `analysis`
+- Type: `research` or `scope-question` (both route to Strategist; names per PROTOCOLS.md §5)
 - Area: `marketing` + `growth`
 - For instrumentation work routed to Builder: `analytics` + `instrumentation`
 

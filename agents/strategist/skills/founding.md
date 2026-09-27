@@ -9,7 +9,7 @@ description: Phase 0 of a new project — evaluate an existing product descripti
 
 - The target project has no `<target-project>/founding/PRODUCT.md` yet (first-time invocation).
 - Human invokes: `@strategist-agent evaluate this product doc <link/path>` / `@strategist-agent kick off Phase 0 for <project>`.
-- Linear ticket with label `phase-0`.
+- Linear ticket with label `founding`.
 
 **Do not activate** if founding docs already exist and the human is asking about a specific feature — that's `pm`'s territory.
 
@@ -263,7 +263,7 @@ docs PR the human reviews. This is the exact flow the founding docs already land
      - `feature` (type)
      - Milestone label (e.g. `milestone-1`)
      - Area hint based on ownership hypothesis: `backend`, `frontend`, or both
-     - When the PM skill picks up this ticket later to draft the full PRD, additional labels (`needs-contract`, `needs-design`, `ai`, `data`, etc.) get added at that point per PM-skill conventions
+     - When the PM skill picks up this ticket later to draft the full PRD, additional labels (`needs-contract`, `needs-design`, `ai`, `data-engineer`, etc.) get added at that point per PM-skill conventions
 3. Update `dev-team-state/projects/<project>/_shared/strategist-marketer/roadmap-marketing-alignment.md` with the MVP feature list (per the Product-Marketing Sync Protocol — so Marketer learns what's coming).
 4. Post in Slack:
    ```

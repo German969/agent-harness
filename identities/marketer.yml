@@ -57,7 +57,10 @@ routing:
     - brand                                       # pr-brand-steward (voice review)
     - growth                                      # growth-analyst skill
     - competitive-intel                           # benchmarking skill
-    - design                                      # creative-brief skill (when paired with content)
+    # `design` used to be here too. Builder-Client also declares it, and the router
+    # gives a shared label to whichever identity file loads first, which readdir
+    # order decides. Builder-Client keeps it; creative work routes by
+    # `marketing-asset`. validate:fleet check 9 now fails on any shared label (HAR-19).
     - marketing-asset                             # creative-brief skill
     - marketer-bot                                # explicit routing-by-label
   slack_default_channels:

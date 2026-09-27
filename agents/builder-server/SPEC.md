@@ -29,7 +29,7 @@ Builder-Server absorbs three engineering sub-roles. They share the same codebase
 |---|---|---|---|
 | **Backend Engineer** | Default skill for general backend work — services, APIs, DB entities, migrations, tests | Always loaded for tickets without a more specific tag | n/a — this is the agent's core |
 | **AI Specialist** | LLM features, prompts, RAG, vector DBs, evals, model routing | Linear tag `ai`, paths matching AI service directory, prompt-template files | >30% of Builder-Server sessions touch AI code for two months, *and* prompt eval workflows feel cramped inside Builder-Server's CLAUDE.md |
-| **Data Engineer** | Time-series schemas, ETL, dbt-style transforms, analytics pipelines | Linear tag `data`, paths matching `db-series/`, ETL scripts, dbt models | Data work consumes >25% of Builder-Server time *and* requires multi-day pipeline projects that benefit from a separate identity |
+| **Data Engineer** | Time-series schemas, ETL, dbt-style transforms, analytics pipelines | Linear label `data-engineer`, paths matching `db-series/`, ETL scripts, dbt models | Data work consumes >25% of Builder-Server time *and* requires multi-day pipeline projects that benefit from a separate identity |
 
 Promoting any of these would create a new top-level agent (e.g. `@ai-agent`, `@data-agent`) with its own GitHub App, Linear identity, and CLAUDE.md. The boundaries are clean — each absorbed role has its own paths and conventions.
 
@@ -261,7 +261,7 @@ Each skill is one file in `agents/builder-server/skills/<name>.md`. The persona 
 ### 5.1 `backend` — Backend Engineering (default)
 
 **Triggers**
-- Any Linear ticket assigned to Strategist that doesn't match `ai` or `data` triggers (i.e. the default skill).
+- Any Linear ticket assigned to Strategist that doesn't match `ai` or `data-engineer` triggers (i.e. the default skill).
 - `@server-agent` mentions in GitHub issue/PR comments without specialized tags.
 
 **Specialized knowledge this skill provides**
@@ -300,7 +300,7 @@ The full development cycle (§4) applies. This skill provides the *knowledge* us
 ### 5.2 `ai-specialist` — AI / LLM Features
 
 **Triggers**
-- Linear ticket with label `ai` or `llm`
+- Linear ticket with label `ai` *(intended; today it starts `backend`, HAR-22)*
 - Paths in the diff matching the AI service directory (e.g. `server/services/ai/`, `apps/ai/`, etc. — defined in stack)
 - Files matching `*prompts*`, `*evals*`, `*rag*`, `langchain.config*`
 
@@ -343,7 +343,7 @@ Full cycle (§4). Additions specific to this skill:
 ### 5.3 `data-engineer` — Data Pipelines & Time-Series
 
 **Triggers**
-- Linear ticket with label `data` or `pipeline`
+- Linear ticket with label `data-engineer` *(intended; today it starts `backend`, HAR-22)*
 - Paths in the diff matching `db-series/`, `etl/`, `dbt/`, `pipelines/`, `analytics/`
 - Migration files in the time-series DB
 
@@ -731,7 +731,7 @@ For the router side (`identities/builder-server.yml` + `router/src/routing/skill
   - GitHub `push` event by a non-bot user on an agent-owned branch → `pr-feedback` skill
 - Skill activation keywords:
   - Linear label `ai` → load `ai-specialist`
-  - Linear label `data` → load `data-engineer`
+  - Linear label `data-engineer` → load `data-engineer` *(intended; today the router starts `backend`, HAR-22)*
   - Default → load `backend`
 
 ## 12. Open questions

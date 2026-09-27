@@ -9,7 +9,7 @@ description: Software architecture — writes ADRs (Architecture Decision Record
 
 - **Every PR opened** on the project repo. `dev-team-state/projects/<project>/platform/arch-review-paths.yml` sets the **depth** — deep when a path matches a `patterns` glob or the change trips a `shape` rule, light otherwise — not whether to review. Runs today as a claude.ai Routine (`dev-team-state/projects/<project>/platform/routines/pr-review.md`); the router path stays unwired by design (`github_auto_triggers: []`, see `CLAUDE.md` Mode A)
 - `@platform-agent` mention requesting an ADR or design opinion
-- Linear ticket labeled `architecture`
+- Linear ticket labeled `arch` or `adr` (both route to Platform and start this skill as its work default)
 - **Contract design request** during planning (review a proposed contract for cross-service consistency, per the [API Contract Protocol](../../PROTOCOLS.md#contract-design-during-planning))
 - **CCP tiebreak** when Builder-Server and Builder-Client disagree on a contract change
 
@@ -166,8 +166,8 @@ Your decision is **binding for the agents**. Humans can override with new inform
 When this skill creates follow-up tickets (e.g. "Implement the refactor that ADR-0023 specifies"), apply labels per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
 
 - Type: `feature` (for new architectural work) or `chore` (for refactors driven by an ADR)
-- Area: based on which Builder owns the work — `backend` / `frontend` / `infra`
-- `architecture` — for tickets whose primary purpose is to discuss or implement an architectural decision
+- Area: based on which Builder owns the work — `backend` / `frontend` / `devops`
+- `arch` — for tickets whose primary purpose is to discuss or implement an architectural decision
 - `breaking-change` — when the ADR introduces an API or contract break
 - Link back to the ADR file path in the ticket description
 

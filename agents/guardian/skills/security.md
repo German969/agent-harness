@@ -47,7 +47,7 @@ description: Code-security review — auth/authz, secret-leak detection, depende
 
 When creating tickets per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
 - Type: `bug` (defect with security impact)
-- Area: `security` + the relevant code area (`backend` / `frontend` / `infra`)
+- Area: `security` + the relevant code area (`backend` / `frontend` / `devops`)
 - Severity: `P0` / `P1` / `P2` / `P3` (per finding severity)
 - `legal-review` if the finding has regulatory implications
 

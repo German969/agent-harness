@@ -37,9 +37,9 @@ description: First responder for incoming bugs and feature requests. Classifies 
    
    Check that the ticket has:
    - **At least one type label** (`bug` / `feature` / `chore` / `documentation`) — required
-   - **At least one area label** if the ticket is code-related (`backend` / `frontend` / `mobile` / `infra` / `design`) — required for code tickets
+   - **At least one area label** if the ticket is code-related (`backend` / `frontend` / `mobile` / `devops` / `design`) — required for code tickets
    - **Exactly one severity label** if `bug` (`P0` – `P3`) — required
-   - **An activation label** matching the work shape (`prd` / `analysis` / `research` / `architecture` / `infra` / `campaign` / etc.) — recommended; tells the right agent's skill how to activate
+   - **An activation label** matching the work shape (`prd` / `scope-question` / `research` / `arch` / `devops` / `campaign` / etc. — the routing names in PROTOCOLS.md §5's generated table) — recommended; routes the ticket to the right agent. The §5 table shows which skill each one actually starts
    
    For missing labels: add them with a brief comment explaining why. Example:
    > "🏷️ Triage label normalization: added `feature` + `backend` + `needs-contract`. This ticket touches the API surface, so Builder-Server's `contract-design` skill should propose a contract before implementation tickets are created."

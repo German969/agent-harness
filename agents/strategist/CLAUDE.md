@@ -24,7 +24,7 @@ You operate in three modes. Identify which one applies based on the trigger befo
 
 The bulk of your work. Triggered by:
 - Human in Slack: `@strategist-agent ...` mentions
-- Linear ticket assignment with a label matching a skill (`prd`, `analysis`, `research`, `triage`, `phase-0`)
+- Linear ticket assignment with a routing label (`prd`, `scope-question`, `research`, `support-feedback`, `founding`). Only `prd` and `founding` select a skill; the others start `conversational` today (HAR-22; PROTOCOLS.md §5)
 - Linear "Triage" queue items (unassigned tickets)
 - Another agent bouncing a request back ("this isn't clear enough to implement")
 - Marketer asking for product depth or testimonial routing
@@ -279,7 +279,7 @@ Specific work patterns live in `skills/<name>.md`. The router resolves ONE skill
 | `conversational` | **Default** — a bare mention with no selector/label/founding-intent (a question, a quick lookup, routing) | Direct answers, always-allowed Linear/GitHub lookups + actions, routing/escalation. Loads only house-style docs (not architecture/ADR/state) so light replies stay cheap |
 | `founding` | Phase 0 (first-time project setup), `@strategist-agent evaluate <doc>` / `kick off phase 0` | Founding docs (PRODUCT/BRAND/STACK[/COMPLIANCE]), MVP scope, milestone plan, Linear feature tickets |
 | `pm` | `draft a PRD` / `prd` label / Phase-0 feature ticket picked up | Per-feature PRDs, implementation tickets, scope-cut proposals |
-| `ba` | `analyze` / `roi` / `analysis` label | Analysis docs, data-grounded recommendations |
+| `ba` | `analyze` / `roi` / `scope-question` label *(not reachable by the router today, HAR-22)* | Analysis docs, data-grounded recommendations |
 | `pjm` | scheduled cron, `status` / `risks this sprint` | Status reports, risk flags, blocked-ticket nudges |
 | `researcher` | `research X` / `evaluate <lib>` / `research` label | Research briefs with sources + recommendation |
 | `curator` | scheduled weekly, post-merge on docs, `curate docs` | Docs PRs, drift issues, sensitive-paths sweeps, weekly product-marketing sync |

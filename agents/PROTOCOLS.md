@@ -588,112 +588,128 @@ With it: Builder-Client owns visual production end-to-end (own UI + screenshots 
 Labels are how skills route, how triage classifies, and how humans understand state at a glance. Without explicit responsibility for **who adds each label and when**, labels drift — tickets are over-labeled, under-labeled, conflicting, or missing the labels their skill-activation triggers depend on. The agent system becomes unreliable.
 
 This protocol defines:
-- **The canonical label registry** (every label the agent system uses)
+- **The label tables** (every label the agent system uses, generated from the code that routes them)
 - **Who adds each label and when**
 - **The triage backstop** for under-labeled tickets
 - **Conflict resolution**
 - **One-time setup** (which labels need to pre-exist in the Linear workspace before Phase 2)
 
-Labels are project-scoped in Linear (each workspace has its own set), so the registry below is the **convention** the agent product enforces. Each new target project running through Phase 1 creates these labels in its Linear workspace.
+Labels are team-scoped in Linear (each workspace has its own set). The tables below list what the agent system uses; each new target project running through Phase 1 creates these labels in its Linear workspace.
 
-### The canonical label registry
+### The label tables
 
-Labels are organized by purpose. Each label has a defined applier and timing.
+**Where each fact lives.** Nothing reads this section; the router reads code. So these tables are **generated from the code**, and `validate:fleet` (check 9) fails if they fall out of date:
 
-#### Skill-activation labels (trigger a specific agent skill)
+- **Which labels route, and to which agent:** `routing.linear_labels` in `identities/*.yml`, the only thing the router reads (`routing/registry.ts`). Names match **exactly**, case included.
+- **Which skill a routed ticket starts:** `LABEL_SKILLS` in `routing/skill.ts`. A routing label not in it starts the agent's **work default**, and that agent's CLAUDE.md then picks the specific procedure.
+- **What each label is for:** `agents/linear-labels.yml`. It holds descriptions only; it adds no routing.
 
-| Label | Activates | Applied by | Timing |
+To change a label, edit the identity file (routing), `LABEL_SKILLS` (skill) or `agents/linear-labels.yml` (description), then run `pnpm labels:protocols` from `router/` and commit the regenerated tables. Check 9 also fails when an identity and the descriptions file disagree, or when two agents declare the same routing label.
+
+This replaced a hand-written "canonical registry" that had drifted from both sources: seven labels under names that never routed (`analysis`, `triage`, `phase-0`, `architecture`, `architecture-design`, `infra`, `data`/`pipeline`), eleven routing labels missing, and type labels in the wrong case (HAR-19).
+
+`agent:<name>-bot` labels are not in these tables. They are the **GitHub PR owner** convention (`ownerFromLabel`, `routing/classifier.ts`), not Linear labels, and live in `agents/github-pr-labels.yml`. The plain `<name>-bot` Linear labels below are explicit routing overrides.
+
+<!-- BEGIN GENERATED: linear-labels. Edit agents/linear-labels.yml or identities/*.yml, then run `pnpm labels:protocols`. -->
+
+#### Routing labels — each sends the ticket to one agent
+
+| Label | Routes to | Starts skill | What it is for |
 |---|---|---|---|
-| `prd` / `spec` | Strategist `pm` skill | Human (via Linear), Strategist `triage` (on classification) | Ticket creation or triage |
-| `analysis` | Strategist `ba` skill | Human, Strategist `triage` | Ticket creation or triage |
-| `research` | Strategist `researcher` skill | Human, Strategist `triage` | Ticket creation |
-| `phase-0` | Strategist `founding` skill | Human (rare; usually invoked via Slack `@mention`) | Project start |
-| `triage` | Strategist `triage` skill | Linear auto-applies to unassigned tickets in the Triage view | Ticket creation |
-| `architecture` | Platform `architect` skill (for an ADR request) | Any agent or human requesting an ADR | When the architectural question is raised |
-| `architecture-design` | Platform `system-design` skill | Human (rare; usually invoked via `@mention` in Phase 3) | Project Phase 3 |
-| `infra` | Platform `devops` skill | Any agent or human flagging an infra change | Ticket creation |
-| `release` | Platform `release-manager` skill | Cron (scheduled releases), human (on-demand) | Release cadence |
-| `campaign` | Marketer `campaign-lead` skill | Human, or Strategist when handing off a launch | Campaign brief |
-| `content` | Marketer `content-writer` | Human, Marketer `campaign-lead` (when decomposing) | One-off or campaign breakdown |
-| `social` | Marketer `social-community` | Cron, human, Marketer `campaign-lead` | Scheduled or campaign |
-| `email` | Marketer `email-lifecycle` | Human, Marketer `campaign-lead` | Campaign or lifecycle setup |
-| `growth` | Marketer `growth-analyst` | Human, Marketer (post-campaign) | Analytics request |
-| `pr` / `brand` | Marketer `pr-brand-steward` | Human | PR-touching work |
-| `ai` / `llm` | Builder-Server `ai-specialist` | Strategist `pm` (when creating impl ticket touching AI), human | PRD decomposition |
-| `data` / `pipeline` | Builder-Server `data-engineer` | Strategist `pm`, human | PRD decomposition |
-| `needs-design` | Strategist `design-prefill` + Builder-Client `claude-design-prefill` | Strategist `pm` when drafting a UI-touching PRD | At PRD creation |
-| `needs-contract` | Builder-Server `contract-design` skill | Strategist `pm` when drafting a PRD with an API surface | At PRD creation |
-| `a11y` | Builder-Client `a11y` skill | Human, Guardian (when raising findings) | Audit request |
-| `mobile` | Builder-Client `mobile` skill (and area classification) | Strategist `pm`, human | At ticket creation |
-| `perf` | Guardian `performance` skill | Human, Guardian (when raising findings), Strategist `triage` (for perf bugs) | Triage or finding |
+| `prd` | Strategist | `pm` | Needs a per-feature PRD with acceptance criteria. Applied by a human at creation, or by Strategist triage on classification. |
+| `scope-question` | Strategist | `conversational` (work default) | A scoping or quantitative question: ROI, conversion, segment or gap analysis. Applied by a human or Strategist triage. |
+| `support-feedback` | Strategist | `conversational` (work default) | Incoming bug or request to classify, reproduce, structure and route. Applied by a human or on intake. |
+| `research` | Strategist | `conversational` (work default) | Needs a decision-ready brief on a technology, library, vendor or question. The brief refuses to start without a defined decision. |
+| `status-question` | Strategist | `conversational` (work default) | Status report, dependency tracking, risk and blocker flagging. Applied by a human. |
+| `curate` | Strategist | `conversational` (work default) | Docs-vs-code drift sweep, sensitive-paths backstop (§2), weekly Product-Marketing sync (§3). Applied by a human. |
+| `design-prefill` | Strategist | `conversational` (work default) | UI work with no design yet: produce a paste-ready Claude Design prompt. Applied by Strategist pm on a UI-touching PRD. |
+| `founding` | Strategist | `founding` | Phase 0: founding docs, MVP scope, milestones, feature tickets. Rare; Phase 0 usually starts in Slack. |
+| `arch` | Platform | `architect` (work default) | An architectural question that needs an ADR. Applied by any agent or human raising it. |
+| `adr` | Platform | `architect` (work default) | Author an Architecture Decision Record. Platform updates docs/architecture/SYSTEM.md in the same PR as a materially architectural ADR. |
+| `system-design` | Platform | `architect` (work default) | Phase 3 whole-system design. Applied by a human, rarely; usually invoked by Slack mention. |
+| `release` | Platform | `architect` (work default) | Release management. Applied by cron on the release cadence, or by a human on demand. |
+| `finops` | Platform | `architect` (work default) | Spend tracking, cost-cap alerting, model-rate drift. Applied by cron or a human. |
+| `incident` | Platform | `architect` (work default) | Production degraded or down. Applied by any agent or human; pair with a severity label (P0 = down, data loss, or customer-visible exposure). |
+| `devops` | Platform | `architect` (work default) | Infra change, CI/CD, provider config. Applied by any agent or human. |
+| `cost-signoff` | Platform | `architect` (work default) | Work that needs explicit spend approval before proceeding. Applied by any agent whose change adds recurring cost. |
+| `backend` | Builder-Server | `backend` (work default) | Backend-area work. Applied by Strategist pm at PRD decomposition, or by Strategist triage. |
+| `api` | Builder-Server | `backend` (work default) | API-surface work. A feature with an API boundary also needs a contract designed during planning (§1). |
+| `needs-contract` | Builder-Server | `backend` (work default) | The feature has an API boundary: propose the contract before implementation tickets exist (§1). Applied by Strategist pm at PRD drafting. |
+| `ai` | Builder-Server | `backend` (work default) | LLM, prompt or eval work. Applied by Strategist pm at PRD decomposition, or by Guardian on llm-security findings. |
+| `data-engineer` | Builder-Server | `backend` (work default) | Pipelines, ingestion, ETL. Applied by Strategist pm or a human. |
+| `migration` | Builder-Server | `backend` (work default) | Schema-migration work. Additive-first, CI-gated, never auto-run on prod without manual approval (founding/STACK.md; ADR-0010). |
+| `server-bot` | Builder-Server | `backend` (work default) | Explicit routing to Builder-Server when no area label fits. Not the GitHub PR-owner label `agent:server-bot`. |
+| `frontend` | Builder-Client | `frontend` (work default) | Frontend-area work. Applied by Strategist pm at PRD decomposition, or by Strategist triage. |
+| `design` | Builder-Client | `frontend` (work default) | Design-touching work. Applied by Strategist pm or triage. |
+| `mobile` | Builder-Client | `frontend` (work default) | Mobile-area work. Applied by Strategist pm or a human at ticket creation. |
+| `a11y` | Builder-Client | `frontend` (work default) | Accessibility audit or fix. Applied by a human requesting an audit, or by Guardian when raising accessibility findings. |
+| `screenshot` | Builder-Client | `frontend` (work default) | Capture product screenshots for the shared library (§4). Applied by a human or by Marketer requesting collateral. |
+| `needs-design` | Builder-Client | `frontend` (work default) | UI work with no design yet. Applied by Strategist pm when drafting a UI-touching PRD; Builders refuse UI work without a design handoff. |
+| `client-bot` | Builder-Client | `frontend` (work default) | Explicit routing to Builder-Client when no area label fits. Not the GitHub PR-owner label `agent:client-bot`. |
+| `security` | Guardian | `qa` (work default) | Security-touching work. Applied by Guardian when raising findings, and by Strategist triage. |
+| `qa` | Guardian | `qa` (work default) | Test-coverage review and path-tier scan. Guardian also auto-fires on pull requests without this label. |
+| `perf` | Guardian | `qa` (work default) | Performance work. Applied by a human, by Guardian when raising findings, or by Strategist triage on a perf bug. |
+| `compliance` | Guardian | `qa` (work default) | Compliance-touching (PII / GDPR / SOC2 / sub-processors). Applied by Guardian and Strategist triage. |
+| `llm-security` | Guardian | `qa` (work default) | Focused prompt-injection and adversarial red-team review. Applied by a human or Guardian. |
+| `legal-review` | Guardian | `qa` (work default) | Needs legal review before merge or publish. Applied by Guardian compliance and Marketer pr-brand-steward. |
+| `threat-model` | Guardian | `qa` (work default) | A focused threat model, distinct from a general security review. Applied when a change alters the attack surface. |
+| `guardian-bot` | Guardian | `qa` (work default) | Explicit routing to Guardian when no security/qa/perf/compliance label fits. Not the GitHub PR-owner label `agent:guardian-bot`. |
+| `campaign` | Marketer | `campaign-lead` | A marketing campaign brief. Applied by a human, or by Strategist when handing off a launch. |
+| `content` | Marketer | `content-writer` | A content piece, one-off or from a campaign breakdown. Applied by a human or Marketer campaign-lead. |
+| `social` | Marketer | `campaign-lead` (work default) | Social and community work. Applied by cron, a human, or Marketer campaign-lead. |
+| `email` | Marketer | `campaign-lead` (work default) | Email and lifecycle work. Applied by a human or Marketer campaign-lead. |
+| `pr` | Marketer | `campaign-lead` (work default) | Press / PR-touching work. Applied by a human. |
+| `brand` | Marketer | `campaign-lead` (work default) | Brand-voice review. Applied by a human. |
+| `growth` | Marketer | `campaign-lead` (work default) | Growth analytics request. Applied by a human, or by Marketer after a campaign. |
+| `competitive-intel` | Marketer | `campaign-lead` (work default) | Competitor research and benchmarking. Applied by a human or on the benchmarking cadence. |
+| `marketing-asset` | Marketer | `campaign-lead` (work default) | A creative brief for a marketing asset. Applied by a human or Marketer campaign-lead. |
+| `marketer-bot` | Marketer | `campaign-lead` (work default) | Explicit routing to Marketer when no marketing label fits. Not the GitHub PR-owner label `agent:marketer-bot`. |
+| `harness` | Harness | `agent-modifier` (work default) | General fleet-tooling work for Harness. Applied by a human. |
+| `agent-improvement` | Harness | `agent-modifier` | Change an existing agent's config, prompts or skills. Applied by a human or an agent reporting a gap. |
+| `agent-misbehavior` | Harness | `misbehavior-debugger` | An agent did something wrong; debug from its session logs. Applied by a human or an agent that observed it. |
+| `meta` | Harness | `agent-modifier` (work default) | Work on the fleet's own process or protocols rather than one agent. Applied by a human. |
+| `gap-analysis` | Harness | `agent-modifier` (work default) | Survey the fleet for a missing capability. Applied by a human. |
+| `new-agent` | Harness | `agent-architect` | Design and add a new agent. Applied by a human. |
+| `new-skill` | Harness | `skill-author` | Add a skill to an existing agent. Applied by a human or the agent that needs it. |
+| `router-change` | Harness | `router-engineer` | Change the router's TypeScript source. Distinct from the GitHub PR label of the same name, which the router applies to router-opened PRs. |
+| `harness-bot` | Harness | `agent-modifier` (work default) | Explicit routing to Harness when no other Harness label fits. Not the GitHub PR-owner label `agent:harness-bot`. |
 
-#### Type / area labels (classification)
+#### Modifier labels — pick the skill, route nowhere on their own
 
-| Label | Description | Applied by |
+| Label | Selects skill | What it is for |
 |---|---|---|
-| `bug` | Defect — something is broken | Strategist `triage` (always); humans on creation |
-| `feature` | New capability | Strategist `pm` (impl tickets), Strategist `triage` |
-| `chore` | Maintenance, refactor, dep bump | Creator |
-| `documentation` | Doc-only change | Creator, Strategist `curator` (for drift fixes) |
-| `backend` | Backend-area work | Strategist `pm`, Strategist `triage` |
-| `frontend` | Frontend-area work | Strategist `pm`, Strategist `triage` |
-| `mobile` | Mobile-area work *(also activates the Mobile skill)* | Strategist `pm`, Strategist `triage` |
-| `infra` | Infra-area work *(also activates DevOps skill)* | Strategist `pm`, Platform, Strategist `triage` |
-| `design` | Design-touching work | Strategist `pm`, Strategist `triage` |
-| `security` | Security-touching | Guardian (when raising findings), Strategist `triage` |
-| `compliance` | Compliance-touching (PII / GDPR / SOC2 / etc.) | Guardian, Strategist `triage` |
+| `benchmark` | `benchmarking` | Alongside a Marketer routing label, selects the benchmarking skill. Routes nowhere on its own. |
 
-Multiple area labels are fine for cross-cutting work (e.g. `backend` + `frontend` for a contract-first feature).
+#### Convention labels — route nothing; applied per the layers below
 
-#### Status / process labels
+| Label | What it is for |
+|---|---|
+| `Bug` | Defect: something is broken. Linear built-in. Every Bug carries exactly one severity label after triage. |
+| `Feature` | New capability. Linear built-in. |
+| `Improvement` | Enhancement, maintenance or doc-only change. Linear built-in. |
+| `P0` | Down / data loss / security exposure / immediate customer impact. Applied by Strategist triage; Guardian escalates. |
+| `P1` | Major degradation. Applied by Strategist triage or Guardian. |
+| `P2` | Minor degradation; users worked around it. Applied by Strategist triage. |
+| `P3` | Cosmetic / nice-to-fix. Applied by Strategist triage. |
+| `blocker` | Sprint blocker. Any agent or human, with a comment saying what is stuck. |
+| `needs-human-review` | Needs a human before the agent proceeds: confidence is low or the decision exceeds its authority. |
+| `complex-deploy` | Needs careful deploy planning. Applied by Platform release management. |
+| `breaking-change` | Contract or API breaking change. Applied during a contract change or an ADR for an API shape change. |
+| `mvp` | MVP epic feature ticket. Applied by Strategist founding in Phase 0.6. |
+| `keep-forever` | State, docs or findings routine cleanup must never archive. Applied by Strategist curator or a human. |
 
-| Label | Description | Applied by | When |
-|---|---|---|---|
-| `blocker` | Sprint blocker | Any agent or human | When work is stuck |
-| `needs-human-review` | Requires human attention before agent proceeds | Any agent | When the agent's confidence is low or decision exceeds its authority |
-| `legal-review` | Requires legal review before merge/publish | Guardian `compliance`, Marketer `pr-brand-steward` | When content/code crosses a legal threshold |
-| `complex-deploy` | Requires careful deploy planning | Platform `release-manager` | At release prep when deploy is non-routine |
-| `breaking-change` | Contract or API breaking change | Builder-Server (during CCP); Platform `architect` (during ADR for an API shape change) | At PR / CCP time |
-
-#### Severity labels (bugs)
-
-| Label | Description | Applied by |
-|---|---|---|
-| `P0` | Down / data-loss / security exposure / immediate customer impact | Strategist `triage`; Guardian (escalates) |
-| `P1` | Major degradation | Strategist `triage`; Guardian |
-| `P2` | Minor degradation; users worked around it | Strategist `triage` |
-| `P3` | Cosmetic / nice-to-fix | Strategist `triage` |
-
-Every `bug` ticket must carry exactly one severity label after Triage.
-
-#### Workflow labels
-
-| Label | Description | Applied by | When |
-|---|---|---|---|
-| `mvp` | MVP epic feature ticket | Strategist `founding` skill | Phase 0.6 (creating MVP feature tickets) |
-| `agent:strategist-bot` | Attributes a PR/ticket to a specific agent | **The agent applies it** — see the note below | At PR/ticket creation by an agent |
-| `agent:server-bot` | (same — one per agent) | The agent | Agent-authored |
-| `agent:client-bot` | | The agent | |
-| `agent:platform-bot` | | The agent | |
-| `agent:guardian-bot` | | The agent | |
-| `agent:marketer-bot` | | The agent | |
-
-#### Audit / preservation labels
-
-| Label | Description | Applied by |
-|---|---|---|
-| `keep-forever` | State entries / docs / findings that should never be archived in routine cleanup | Strategist `curator`, humans |
+<!-- END GENERATED: linear-labels -->
 
 ### Layer 1 — Creator labels at creation
 
 Whoever creates a ticket adds the labels it can confidently apply. This is the first line — the labels are most accurate when applied by the creator who has the most context about what the ticket is for.
 
 **Agent creators**:
-- **Strategist `pm`** (creating implementation tickets from a PRD): apply `prd` link via parent, type (`feature` / `bug`), area (`backend` / `frontend` / `mobile`), conditional activators (`needs-contract` if API boundary, `needs-design` if UI work), `ai` / `data` / `mobile` if the work routes to a specific Builder skill
-- **Strategist `triage`**: apply `bug` (or other classification), severity (`P0`–`P3`), area, link to duplicates
-- **Strategist `founding`** (MVP feature tickets): apply `mvp`, `feature`, milestone label, area hint
-- **Platform `architect`** (ADR follow-up impl tickets): apply `architecture` for the ADR ticket itself + relevant area for follow-up impl tickets
-- **Platform `devops`** (infra change tickets): apply `infra`
+- **Strategist `pm`** (creating implementation tickets from a PRD): apply `prd` link via parent, type (`Feature` / `Bug`), area (`backend` / `frontend` / `mobile`), conditional activators (`needs-contract` if API boundary, `needs-design` if UI work), `ai` / `data-engineer` / `mobile` if the work routes to a specific Builder skill
+- **Strategist `triage`**: apply `Bug` (or other classification), severity (`P0`–`P3`), area, link to duplicates
+- **Strategist `founding`** (MVP feature tickets): apply `mvp`, `Feature`, milestone label, area hint
+- **Platform `architect`** (ADR follow-up impl tickets): apply `adr` for the ADR ticket itself + relevant area for follow-up impl tickets
+- **Platform `devops`** (infra change tickets): apply `devops`
 - **Platform `release-manager`**: apply `release`, `complex-deploy` if applicable
 - **Builder agents** (follow-up tickets they raise from PR review): inherit area + type + the originating label
 - **Guardian** (remediation tickets): apply `security` / `compliance` / `perf` / severity per finding
@@ -708,13 +724,13 @@ The agent applies the `agent:<bot>` attribution label itself. NOT automatic: the
 Every ticket landing in the Linear Triage view passes through Strategist's `triage` skill. In addition to its existing classify-and-route procedure, the `triage` skill **normalizes labels**:
 
 1. **Required labels for any ticket**:
-   - At least one type label (`bug` / `feature` / `chore` / `documentation`)
-   - At least one area label if the ticket is code-related (`backend` / `frontend` / `mobile` / `infra` / `design`)
-2. **Required for `bug` tickets**: exactly one severity label (`P0` – `P3`)
+   - At least one type label (`Bug` / `Feature` / `Improvement`, Linear's built-ins, capitalised)
+   - At least one area label if the ticket is code-related (`backend` / `frontend` / `mobile` / `devops` / `design`)
+2. **Required for `Bug` tickets**: exactly one severity label (`P0` – `P3`)
 3. **Recommended**: an activation label matching the work shape (e.g. `prd` if it needs a PRD, `research` if it needs evaluation, etc.)
 
 Triage adds missing labels with a brief comment explaining:
-> "🏷️ Triage label normalization: added `feature` + `backend` + `needs-contract`. This ticket touches the API surface so Builder-Server's `contract-design` skill should propose a contract before implementation tickets are created."
+> "🏷️ Triage label normalization: added `Feature` + `backend` + `needs-contract`. This ticket touches the API surface so Builder-Server's `contract-design` skill should propose a contract before implementation tickets are created."
 
 Triage **never silently changes** existing labels. If a label looks wrong, it adds a comment proposing the change and tags the appropriate agent or human for confirmation.
 
@@ -735,7 +751,7 @@ When labels conflict, **Triage resolves** (or escalates to a human if the confli
 
 | Conflict | Resolution |
 |---|---|
-| Both `feature` and `bug` | Triage picks one based on the ticket's content; explains in a comment |
+| Both `Feature` and `Bug` | Triage picks one based on the ticket's content; explains in a comment |
 | Multiple severity labels | Triage picks the **highest** (most severe); comments |
 | Multiple area labels | **Allowed** — cross-cutting work is real (e.g. `backend` + `frontend` for a contract-first feature) |
 | Multiple activation labels | **Usually allowed** (e.g. `prd` + `needs-design` is correct for a UI-touching PRD). Investigate if two mutually-exclusive skills are tagged. |
@@ -768,12 +784,12 @@ Before any agent tries to apply a label, the labels must **exist in the Linear w
 
 Setup procedure:
 1. Authenticated as a Linear admin, navigate to the workspace's label settings.
-2. Create every label in the canonical registry (about 35 labels).
+2. Create every label in the tables above, with its description from `agents/linear-labels.yml` (Linear caps a description at 255 characters; check 9 enforces it).
 3. Create any custom labels defined in the project's `.dev-team.yml`.
 4. Group labels in Linear by category for readability (Linear supports label groups in some plans).
 5. Document the workspace's label set in `<target-project>/founding/` (a small `LINEAR.md` is fine) so humans creating tickets manually know what's available.
 
-A future improvement: a small `dev-team/scripts/setup-linear-labels.sh` that calls the Linear API to bulk-create labels from this protocol's registry + the project's custom list. Out of scope for v1.
+Checking that the workspace actually has them, and creating the missing ones from `agents/linear-labels.yml`, is HAR-8. Until it lands, this step is manual; the Iris team's labels were created by hand on 2026-09-10.
 
 ### Why this protocol exists
 

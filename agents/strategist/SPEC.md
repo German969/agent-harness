@@ -44,7 +44,7 @@ Strategist is **multi-modal** — different triggers produce different shapes of
 
 The bulk of Strategist's work. Triggered by:
 - Human request in Slack (`@strategist-agent draft a PRD…`, `@strategist-agent research…`, `@strategist-agent triage this`).
-- Linear ticket assignment with a label that matches a skill (`prd`, `analysis`, `research`, `triage`).
+- Linear ticket assignment with a routing label (`prd`, `scope-question`, `research`, `support-feedback`). Only `prd` and `founding` select a skill; the others start `conversational` today (HAR-22; PROTOCOLS.md §5).
 - Linear "Triage" queue items (unassigned tickets) — auto-routed.
 - Another agent bouncing a request back (e.g. `@server-agent` says "this ticket isn't clear enough to implement" → Strategist re-engages the requester).
 - Marketer asking for product depth during campaign discovery, or for testimonial routing.
@@ -84,7 +84,7 @@ Each skill is one file in `agents/strategist/skills/<name>.md`. The router resol
 
 **Triggers**
 - Slack: `@strategist-agent draft a PRD for X` / `@strategist-agent help me scope Y`
-- Linear: ticket assigned to Strategist with label `prd` / `spec`, OR a feature ticket created during Phase 0 (`founding` skill) is picked up for development
+- Linear: ticket assigned to Strategist with label `prd`, OR a feature ticket created during Phase 0 (`founding` skill) is picked up for development
 - Cross-agent inbound: another bot (Builder-*, Guardian) posts "this needs a PRD before I can act on it"
 
 **Scope: feature-level PRDs**
@@ -132,7 +132,7 @@ The PM skill produces **per-feature PRDs** — one feature at a time, with detai
 
 **Triggers**
 - Slack: `@strategist-agent what's the ROI on X` / `analyze conversion for Y` / `quantify the impact of Z`
-- Linear: ticket with `analysis` label
+- Linear: ticket with `scope-question` label *(intended; today it starts `conversational`, HAR-22)*
 
 **Procedure**
 1. **Frame the question precisely** — what decision is this analysis informing?
@@ -354,7 +354,7 @@ The PM skill produces **per-feature PRDs** — one feature at a time, with detai
 **Triggers**
 - First-time Strategist invocation in a target project (no `<target-project>/founding/PRODUCT.md` exists yet).
 - Explicit human invocation: `@strategist-agent evaluate this product doc` / `@strategist-agent kick off Phase 0 for <project>` (with a product description file attached or linked).
-- Linear ticket with label `phase-0`.
+- Linear ticket with label `founding`.
 
 This skill is **interactive and multi-session**. Unlike most skills that produce a one-shot artifact, `founding` runs a multi-turn discussion with the user in Slack, iterating on each foundational decision. It is invoked once per project, at the start. Steady-state PRD work is handled by the `pm` skill afterward.
 
@@ -553,7 +553,7 @@ Strategist reads this surface eagerly at session start (it's compact) and writes
 | PRD complete + contract agreed, needs backend implementation | `@server-agent` (via Linear assignment) | Linear ticket with AC, link to PRD, agreed contract version, hypothesis on affected files |
 | PRD complete + contract agreed, needs frontend implementation | `@client-agent` (via Linear assignment) | Linear ticket with AC, link to PRD, agreed contract version, link to Claude Design pre-fill (if UI work) — not blocked by the backend ticket (contract-first parallel) |
 | Triage produces a reproducible bug | `@server-agent` or `@client-agent` (based on code area) | Linear ticket with reproduction, severity, hypothesis |
-| Architecture decision needed | `@platform-agent` (via Linear `architecture` tag) | Comment with the question, links to relevant code, recommended depth |
+| Architecture decision needed | `@platform-agent` (via Linear `arch` label) | Comment with the question, links to relevant code, recommended depth |
 | Security finding needs structured remediation plan | `@platform-agent` or `@guardian-agent` | Linear ticket with finding summary and PRD-style remediation plan |
 | Marketing collateral needed for a launch | `@marketer-agent` (via Linear `launch` tag) | Linear ticket with launch context, feature summary, target audience |
 | Continuous product-marketing knowledge flow | `@marketer-agent` (via the shared coordination surface) | Contributions to `_shared/strategist-marketer/` per the [Product-Marketing Sync Protocol](../PROTOCOLS.md#3-product-marketing-sync-protocol) — customer signals, testimonial candidates, roadmap updates, positioning insights |

@@ -8,7 +8,7 @@ description: Product Manager — produces per-feature PRDs (Product Requirement 
 ## Activate when
 
 - Slack: `@strategist-agent draft a PRD for X` / `@strategist-agent help me scope Y`
-- Linear: ticket labeled `prd` or `spec`
+- Linear: ticket labeled `prd`
 - Linear: a Phase-0-created feature ticket gets picked up for development (its label or status shifts to "ready")
 - Cross-agent: a Builder bot bounces back "this needs a PRD before I can act on it"
 
@@ -84,7 +84,7 @@ This skill produces **per-feature PRDs** — one feature at a time, with accepta
      - Type: `feature` (or `bug` for triage-driven fix tickets)
      - Area: `backend` for server-bot tickets, `frontend` for client-bot tickets, `mobile` for mobile work
      - Conditional activators: `needs-contract` on backend tickets when the feature has an API surface (triggers Builder-Server's `contract-design` skill); `needs-design` on frontend tickets when UI work has no design yet (triggers Builder-Client's `claude-design-prefill` skill)
-     - Skill-specific tags: `ai` / `llm` for AI-feature tickets (routes to Builder-Server's `ai-specialist` skill); `data` / `pipeline` for data-pipeline work (routes to `data-engineer` skill)
+     - Skill-specific labels: `ai` for AI-feature tickets, `data-engineer` for data-pipeline work. Both route to Builder-Server, which today starts `backend` for either: the router resolves one skill per session, and neither label selects `ai-specialist` or `data-engineer` (HAR-22; PROTOCOLS.md §5)
      - Milestone label if part of an MVP epic
 
 6. **If UI work is involved**, chain into the `design-prefill` skill (§5.7) before assigning client work — Builder-Client refuses UI work without a design handoff.

@@ -9,7 +9,7 @@ description: CI/CD, Docker, infra-as-code, observability config, runbooks, deplo
 
 - CI failure on infra paths (`.github/workflows/**`, `Dockerfile*`, IaC dirs)
 - `@platform-agent` mention for an infra change
-- Linear ticket labeled `infra`
+- Linear ticket labeled `devops`. *Today this routes to Platform but starts `architect`: `devops` is not in `LABEL_SKILLS`, and no selector reaches this skill (HAR-22).*
 - A Builder agent reports a CI/infra issue (not a code issue)
 - Scheduled monthly observability config review
 
@@ -53,7 +53,7 @@ Infra changes follow the **Builder-Server development cycle** (Plan → Implemen
 ### Label conventions
 
 When creating tickets, apply labels per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
-- `infra` — always (activates this skill on the receiving end if it's a follow-up to another agent)
+- `devops` — always (routes a follow-up to Platform; today it starts `architect`, not this skill, HAR-22)
 - Type: `chore` for routine infra maintenance; `feature` for new infra capabilities; `bug` for infra defects
 - `complex-deploy` — when the deploy plan is non-routine (multi-step, requires sequencing, has observability checks between steps)
 

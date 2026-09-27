@@ -28,8 +28,8 @@ Platform absorbs four sub-roles. They share the trait of being *system-wide* rat
 
 | Sub-role | What it does | Trigger to load this skill | Promotion criteria |
 |---|---|---|---|
-| **Software Architect** | ADRs, cross-service consistency, refactoring proposals, dependency-graph hygiene, contract-design review + CCP tiebreaking | PR opened (auto-review for arch concerns), `@platform-agent` arch mention, Linear `architecture` tag, contract-design request, CCP needing a tiebreak | A dedicated principal-architect human wants a co-pilot bot, *or* architecture review volume exceeds ~15 substantive reviews/week |
-| **DevOps Engineer** | CI/CD, Docker, IaC, observability config, runbooks, deploy preparation | CI failure on infra paths, `@platform-agent` infra mention, Linear `infra` tag, paths in `.github/`, `Dockerfile*`, IaC dirs | Infra work consumes >40% of Platform time *and* needs a separate on-call identity |
+| **Software Architect** | ADRs, cross-service consistency, refactoring proposals, dependency-graph hygiene, contract-design review + CCP tiebreaking | PR opened (auto-review for arch concerns), `@platform-agent` arch mention, Linear `arch` label, contract-design request, CCP needing a tiebreak | A dedicated principal-architect human wants a co-pilot bot, *or* architecture review volume exceeds ~15 substantive reviews/week |
+| **DevOps Engineer** | CI/CD, Docker, IaC, observability config, runbooks, deploy preparation | CI failure on infra paths, `@platform-agent` infra mention, Linear `devops` label, paths in `.github/`, `Dockerfile*`, IaC dirs | Infra work consumes >40% of Platform time *and* needs a separate on-call identity |
 | **Release Manager** | Cut releases, generate changelogs, version bumps, coordinate deploy gates | Scheduled (release cadence), `@platform-agent cut release` | Release frequency exceeds daily *and* coordination overhead justifies a dedicated bot |
 | **FinOps** | Cost monitoring across all spend (incl. the agent fleet's own Anthropic bill), savings recommendations, anomaly alerts | Scheduled (daily/weekly), budget-threshold webhook | Multi-project cost attribution becomes complex enough to warrant a dedicated finance-facing bot |
 
@@ -90,7 +90,7 @@ Each skill is one file in `agents/platform/skills/<name>.md`.
 **Triggers**
 - PR opened that's architecturally significant (touches service boundaries, adds a dependency, changes a cross-cutting pattern — detected by path/size heuristics in `dev-team-state/projects/<project>/platform/arch-review-paths.yml`, per §6). **Not wired:** `identities/platform.yml` sets `github_auto_triggers: []`, so no PR opens Platform, and the heuristics file has never been created.
 - `@platform-agent` mention requesting an ADR or design opinion.
-- Linear ticket with `architecture` tag.
+- Linear ticket with `arch` or `adr` label.
 - **Contract design request** during planning (review a proposed contract for cross-service consistency).
 - **CCP tiebreak** when Builder-Server and Builder-Client disagree.
 
@@ -157,7 +157,7 @@ The point of steps 7–8 is to **surface the ADR where the work happens** (Linea
 **Triggers**
 - CI failure on infra paths (`.github/workflows/**`, `Dockerfile*`, IaC).
 - `@platform-agent` mention for an infra change.
-- Linear `infra` tag.
+- Linear `devops` label *(intended; today it starts `architect`, HAR-22)*.
 - A Builder agent reports a CI/infra issue (not a code issue).
 
 **Specialized knowledge this skill provides**
@@ -323,7 +323,7 @@ Infra changes follow the **Builder-Server development cycle** (Plan → Implemen
 **Triggers**
 - **First-time invocation in Phase 3** of the bootstrap (after Phase 0 founding docs land, before any code exists). Detected by SessionStart: founding docs present + no `<target-project>/docs/architecture/SYSTEM.md` exists.
 - Explicit human invocation: `@platform-agent design the system architecture` / `@platform-agent kick off architecture design`.
-- Linear ticket with label `architecture-design`.
+- Linear ticket with label `system-design` *(today it starts `architect`; the `design` selector starts this skill, HAR-22)*.
 - Explicit re-invocation for a major redesign (rare; expensive): `@platform-agent redesign architecture`.
 
 This skill is **one-time, multi-session, interactive** — analogous to Strategist's `founding` skill. It runs once per project at the start. Subsequent architecture work happens incrementally through `architect` (§5.1).
@@ -580,7 +580,7 @@ For the router side (`identities/platform.yml` + `router/src/routing/skill.ts`):
   - CI failure on infra paths → `devops` skill
   - Monitoring alert webhook → `incident-response` skill (high priority)
   - Cron: release cadence → `release-manager`; daily/weekly → `finops`
-- Skill activation keywords: `architecture`/`adr` → architect; `infra`/`ci`/`deploy` → devops; `release` → release-manager; `cost`/`finops` → finops; `incident` → incident-response.
+- Skill selection: the `@platform-agent` selectors are `design` → system-design, `adr` → architect, `cost` → finops, `release` → release-manager, `incident` → incident-response (`AGENT_SKILL_SELECTORS`, router/src/routing/skill.ts). Label routing, and the skill each label starts, is PROTOCOLS.md §5's generated table; no selector or label reaches `devops` today (HAR-22).
 
 ## 12. Open questions
 

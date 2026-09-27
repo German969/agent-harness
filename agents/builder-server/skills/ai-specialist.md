@@ -7,7 +7,7 @@ description: LLM features — prompts, RAG, evals, model selection. Every prompt
 
 ## Activate when
 
-- Linear ticket with label `ai` or `llm`
+- Linear ticket with label `ai`. *Today this routes to Builder-Server but starts `backend`: `ai` is not in `LABEL_SKILLS`, and no selector reaches `ai-specialist` (HAR-22).*
 - Paths in the diff matching the AI service directory (e.g. `server/services/ai/`, `apps/ai/`, etc. — defined in stack)
 - Files matching `*prompts*`, `*evals*`, `*rag*`, `langchain.config*`
 

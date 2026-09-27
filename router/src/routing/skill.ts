@@ -289,6 +289,23 @@ function extractFirstMatchingLabel(event: WebhookEvent): string | undefined {
  * `campaign-lead`; which agent-label pairs actually occur is a routing question,
  * not a skill-resolution one, and asserting it here would invent failures.
  */
+/** The skill a Linear label selects, if it is in LABEL_SKILLS. Read by the §5 label
+ *  table generator (config/linearLabels.ts), so the table shows what the router
+ *  actually selects rather than what a comment claims. */
+export function labelSkill(label: string): SkillId | undefined {
+  return LABEL_SKILLS[label];
+}
+
+/** Every label LABEL_SKILLS knows. */
+export function labelSkillKeys(): string[] {
+  return Object.keys(LABEL_SKILLS);
+}
+
+/** The skill a label-routed ticket starts when its label is not in LABEL_SKILLS. */
+export function workDefaultSkill(agent: AgentId): SkillId {
+  return WORK_DEFAULT_SKILLS[agent];
+}
+
 export function resolvableSkills(agent: AgentId): SkillId[] {
   const prFeedback = PR_FEEDBACK_SKILLS[agent];
   return [

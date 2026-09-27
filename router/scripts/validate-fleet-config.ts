@@ -36,6 +36,10 @@
 //   8. The GitHub PR label registry (agents/github-pr-labels.yml) and the agents'
 //      create_pr hooks agree in both directions. Whether the labels exist on GitHub
 //      needs a token, so that half runs in the github-labels workflow instead.
+//   9. The Linear label tables in PROTOCOLS.md §5 are what the generator writes, and
+//      agents/linear-labels.yml agrees with the identities and LABEL_SKILLS: every
+//      routing label described, no label routed by two agents, every LABEL_SKILLS key
+//      either routing or a described modifier, descriptions within Linear's 255 cap.
 //
 // Exits non-zero listing every problem found, rather than stopping at the first:
 // fixing config one CI run at a time is how a five-minute edit becomes an hour.
@@ -52,6 +56,15 @@ import {
 } from '../src/hooks/registry.js';
 import type { GlobRegistrySpec } from '../src/config/globRegistry.js';
 import { validateGlobRegistryFile } from '../src/config/globRegistry.js';
+import { loadRoutingFacts } from '../src/config/linearLabelFacts.js';
+import {
+  LABELS_PATH,
+  PROTOCOLS_PATH,
+  crossCheckLinearLabels,
+  generatedBlockProblems,
+  parseLabelDescriptions,
+  renderLabelTables,
+} from '../src/config/linearLabels.js';
 import {
   REGISTRY_PATH,
   crossCheckLabels,
@@ -436,6 +449,33 @@ for (const agent of agents) {
   }
 }
 
+// 9 — the Linear label tables in PROTOCOLS.md §5 are generated from the code, and
+//     the descriptions file agrees with it (HAR-19). §5 used to be a hand-written
+//     "canonical registry" nothing read, and it drifted from the identities.
+{
+  // Identity load errors are already reported by check 4.
+  const { facts } = loadRoutingFacts(repoRoot);
+  let labelsText: string | undefined;
+  try {
+    labelsText = readFileSync(join(repoRoot, LABELS_PATH), 'utf-8');
+  } catch (err) {
+    problems.push(`${LABELS_PATH}: could not read — ${(err as Error).message}`);
+  }
+  if (labelsText !== undefined) {
+    const { descriptions, problems: shape } = parseLabelDescriptions(labelsText);
+    problems.push(...shape);
+    if (descriptions) {
+      problems.push(...crossCheckLinearLabels(descriptions, facts));
+      try {
+        const doc = readFileSync(join(repoRoot, PROTOCOLS_PATH), 'utf-8');
+        problems.push(...generatedBlockProblems(doc, renderLabelTables(descriptions, facts)));
+      } catch (err) {
+        problems.push(`${PROTOCOLS_PATH}: could not read — ${(err as Error).message}`);
+      }
+    }
+  }
+}
+
 // 5 — every skill the router can resolve for an agent has a file to deliver.
 //     Before the session was handed its skill's markdown this was cosmetic; now a
 //     missing file means the agent runs the trigger with no procedure at all.
@@ -457,5 +497,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, both guardian glob registries well-formed, PR label registry matches the hooks`,
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, both guardian glob registries well-formed, PR label registry matches the hooks, §5 Linear label tables current`,
 );

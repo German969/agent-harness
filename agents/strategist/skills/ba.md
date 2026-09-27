@@ -8,7 +8,7 @@ description: Business Analyst — quantitative analysis. ROI estimates, conversi
 ## Activate when
 
 - Slack: `@strategist-agent what's the ROI on X` / `analyze conversion for Y` / `quantify the impact of Z`
-- Linear: ticket labeled `analysis`
+- Linear: ticket labeled `scope-question`. *Today this routes to Strategist but starts `conversational`: the label is not in `LABEL_SKILLS`, and no selector reaches `ba` (HAR-22).*
 - Cross-agent: `@marketer-agent` requests competitor positioning data (delegates from Marketer's Benchmarking; provide if you have the data)
 
 **Do not activate** if `<target-project>/founding/` is missing — refuse and recommend Phase 0 first. Analysis without product context is unanchored.

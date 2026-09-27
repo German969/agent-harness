@@ -1,0 +1,114 @@
+# Linear labels the fleet uses, with a description for each (HAR-19, HAR-8).
+#
+# WHICH labels route, and to whom, is decided by `routing.linear_labels` in
+# identities/*.yml, the only thing the router reads (routing/registry.ts). WHICH
+# skill a routed ticket starts is decided by LABEL_SKILLS in routing/skill.ts. This
+# file adds only what neither carries: a description saying what the label is for
+# and who applies it. It must not restate routing or skills. Those appear in the
+# generated table in agents/PROTOCOLS.md §5, derived from the code.
+#
+# validate:fleet check 9 fails when:
+#   - a routing label in an identity file is missing here, or one listed here is
+#     declared by no identity;
+#   - a modifier is not a LABEL_SKILLS key, or it routes on its own;
+#   - a convention label is also a routing label;
+#   - two identities declare the same routing label (the router takes whichever file
+#     loads first, and readdir order is not something to route on);
+#   - a description is empty or over 255 characters (Linear rejects it);
+#   - the generated table in PROTOCOLS.md §5 is not what `pnpm labels:protocols`
+#     would write.
+#
+# Labels are team-scoped in Linear; this file is the fleet's list, not any one
+# workspace's inventory. Whether each exists in a given workspace is HAR-8's check.
+
+version: 1
+
+# Labels that route a ticket to an agent. Each appears in exactly one identity file.
+routing:
+  # Strategist
+  prd: "Needs a per-feature PRD with acceptance criteria. Applied by a human at creation, or by Strategist triage on classification."
+  scope-question: "A scoping or quantitative question: ROI, conversion, segment or gap analysis. Applied by a human or Strategist triage."
+  support-feedback: "Incoming bug or request to classify, reproduce, structure and route. Applied by a human or on intake."
+  research: "Needs a decision-ready brief on a technology, library, vendor or question. The brief refuses to start without a defined decision."
+  status-question: "Status report, dependency tracking, risk and blocker flagging. Applied by a human."
+  curate: "Docs-vs-code drift sweep, sensitive-paths backstop (§2), weekly Product-Marketing sync (§3). Applied by a human."
+  design-prefill: "UI work with no design yet: produce a paste-ready Claude Design prompt. Applied by Strategist pm on a UI-touching PRD."
+  founding: "Phase 0: founding docs, MVP scope, milestones, feature tickets. Rare; Phase 0 usually starts in Slack."
+  # Platform
+  arch: "An architectural question that needs an ADR. Applied by any agent or human raising it."
+  adr: "Author an Architecture Decision Record. Platform updates docs/architecture/SYSTEM.md in the same PR as a materially architectural ADR."
+  system-design: "Phase 3 whole-system design. Applied by a human, rarely; usually invoked by Slack mention."
+  release: "Release management. Applied by cron on the release cadence, or by a human on demand."
+  finops: "Spend tracking, cost-cap alerting, model-rate drift. Applied by cron or a human."
+  incident: "Production degraded or down. Applied by any agent or human; pair with a severity label (P0 = down, data loss, or customer-visible exposure)."
+  devops: "Infra change, CI/CD, provider config. Applied by any agent or human."
+  cost-signoff: "Work that needs explicit spend approval before proceeding. Applied by any agent whose change adds recurring cost."
+  # Builder-Server
+  backend: "Backend-area work. Applied by Strategist pm at PRD decomposition, or by Strategist triage."
+  api: "API-surface work. A feature with an API boundary also needs a contract designed during planning (§1)."
+  needs-contract: "The feature has an API boundary: propose the contract before implementation tickets exist (§1). Applied by Strategist pm at PRD drafting."
+  ai: "LLM, prompt or eval work. Applied by Strategist pm at PRD decomposition, or by Guardian on llm-security findings."
+  data-engineer: "Pipelines, ingestion, ETL. Applied by Strategist pm or a human."
+  migration: "Schema-migration work. Additive-first, CI-gated, never auto-run on prod without manual approval (founding/STACK.md; ADR-0010)."
+  server-bot: "Explicit routing to Builder-Server when no area label fits. Not the GitHub PR-owner label `agent:server-bot`."
+  # Builder-Client
+  frontend: "Frontend-area work. Applied by Strategist pm at PRD decomposition, or by Strategist triage."
+  design: "Design-touching work. Applied by Strategist pm or triage."
+  mobile: "Mobile-area work. Applied by Strategist pm or a human at ticket creation."
+  a11y: "Accessibility audit or fix. Applied by a human requesting an audit, or by Guardian when raising accessibility findings."
+  screenshot: "Capture product screenshots for the shared library (§4). Applied by a human or by Marketer requesting collateral."
+  needs-design: "UI work with no design yet. Applied by Strategist pm when drafting a UI-touching PRD; Builders refuse UI work without a design handoff."
+  client-bot: "Explicit routing to Builder-Client when no area label fits. Not the GitHub PR-owner label `agent:client-bot`."
+  # Guardian
+  security: "Security-touching work. Applied by Guardian when raising findings, and by Strategist triage."
+  qa: "Test-coverage review and path-tier scan. Guardian also auto-fires on pull requests without this label."
+  perf: "Performance work. Applied by a human, by Guardian when raising findings, or by Strategist triage on a perf bug."
+  compliance: "Compliance-touching (PII / GDPR / SOC2 / sub-processors). Applied by Guardian and Strategist triage."
+  llm-security: "Focused prompt-injection and adversarial red-team review. Applied by a human or Guardian."
+  legal-review: "Needs legal review before merge or publish. Applied by Guardian compliance and Marketer pr-brand-steward."
+  threat-model: "A focused threat model, distinct from a general security review. Applied when a change alters the attack surface."
+  guardian-bot: "Explicit routing to Guardian when no security/qa/perf/compliance label fits. Not the GitHub PR-owner label `agent:guardian-bot`."
+  # Marketer
+  campaign: "A marketing campaign brief. Applied by a human, or by Strategist when handing off a launch."
+  content: "A content piece, one-off or from a campaign breakdown. Applied by a human or Marketer campaign-lead."
+  social: "Social and community work. Applied by cron, a human, or Marketer campaign-lead."
+  email: "Email and lifecycle work. Applied by a human or Marketer campaign-lead."
+  pr: "Press / PR-touching work. Applied by a human."
+  brand: "Brand-voice review. Applied by a human."
+  growth: "Growth analytics request. Applied by a human, or by Marketer after a campaign."
+  competitive-intel: "Competitor research and benchmarking. Applied by a human or on the benchmarking cadence."
+  marketing-asset: "A creative brief for a marketing asset. Applied by a human or Marketer campaign-lead."
+  marketer-bot: "Explicit routing to Marketer when no marketing label fits. Not the GitHub PR-owner label `agent:marketer-bot`."
+  # Harness
+  harness: "General fleet-tooling work for Harness. Applied by a human."
+  agent-improvement: "Change an existing agent's config, prompts or skills. Applied by a human or an agent reporting a gap."
+  agent-misbehavior: "An agent did something wrong; debug from its session logs. Applied by a human or an agent that observed it."
+  meta: "Work on the fleet's own process or protocols rather than one agent. Applied by a human."
+  gap-analysis: "Survey the fleet for a missing capability. Applied by a human."
+  new-agent: "Design and add a new agent. Applied by a human."
+  new-skill: "Add a skill to an existing agent. Applied by a human or the agent that needs it."
+  router-change: "Change the router's TypeScript source. Distinct from the GitHub PR label of the same name, which the router applies to router-opened PRs."
+  harness-bot: "Explicit routing to Harness when no other Harness label fits. Not the GitHub PR-owner label `agent:harness-bot`."
+
+# Labels in LABEL_SKILLS that route nowhere on their own. They pick the skill when
+# the ticket also carries a label that routes it to the agent owning that skill.
+modifiers:
+  benchmark: "Alongside a Marketer routing label, selects the benchmarking skill. Routes nowhere on its own."
+
+# Labels the fleet applies that route nothing: classification, severity, status.
+# The router ignores them. Triage and the agents apply them by convention (§5
+# Layers 1–3). Names are case-sensitive; the type labels are Linear's built-ins.
+conventions:
+  Bug: "Defect: something is broken. Linear built-in. Every Bug carries exactly one severity label after triage."
+  Feature: "New capability. Linear built-in."
+  Improvement: "Enhancement, maintenance or doc-only change. Linear built-in."
+  P0: "Down / data loss / security exposure / immediate customer impact. Applied by Strategist triage; Guardian escalates."
+  P1: "Major degradation. Applied by Strategist triage or Guardian."
+  P2: "Minor degradation; users worked around it. Applied by Strategist triage."
+  P3: "Cosmetic / nice-to-fix. Applied by Strategist triage."
+  blocker: "Sprint blocker. Any agent or human, with a comment saying what is stuck."
+  needs-human-review: "Needs a human before the agent proceeds: confidence is low or the decision exceeds its authority."
+  complex-deploy: "Needs careful deploy planning. Applied by Platform release management."
+  breaking-change: "Contract or API breaking change. Applied during a contract change or an ADR for an API shape change."
+  mvp: "MVP epic feature ticket. Applied by Strategist founding in Phase 0.6."
+  keep-forever: "State, docs or findings routine cleanup must never archive. Applied by Strategist curator or a human."
