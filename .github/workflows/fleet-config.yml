@@ -19,28 +19,35 @@ name: fleet-config
 # every prose edit to an agent's CLAUDE.md, or skipping this on an agents/ edit.
 # Both are wrong. Keeping it separate also leaves ci.yml's `workflow_call` contract
 # with deploy.yml untouched.
+#
+# The paths are everything the validator reads (HAR-25). They used to list a handful
+# of router files by name, and the validator had grown to import 39 files, 28 of
+# them outside that list: routing/skill.ts, which checks 5, 9 and 10 read, among
+# them. A PR touching only skill.ts ran ci.yml and never ran this. `router/src/**`
+# covers every import, including the next one; router/tests/config/
+# fleetConfigPaths.test.ts fails if the validator ever imports a file these paths
+# miss. package.json and the lockfile are here because a dependency bump (js-yaml,
+# zod, minimatch) can change what the validator accepts.
 
 on:
   pull_request:
     paths:
       - 'agents/**'
       - 'identities/**'
-      - 'router/src/config/**'
-      - 'router/src/hooks/registry.ts'
-      - 'router/src/runtime/modelRates.ts'
-      - 'router/src/runtime/modelCheck.ts'
+      - 'router/src/**'
       - 'router/scripts/validate-fleet-config.ts'
+      - 'router/package.json'
+      - 'router/pnpm-lock.yaml'
       - '.github/workflows/fleet-config.yml'
   push:
     branches: [main]
     paths:
       - 'agents/**'
       - 'identities/**'
-      - 'router/src/config/**'
-      - 'router/src/hooks/registry.ts'
-      - 'router/src/runtime/modelRates.ts'
-      - 'router/src/runtime/modelCheck.ts'
+      - 'router/src/**'
       - 'router/scripts/validate-fleet-config.ts'
+      - 'router/package.json'
+      - 'router/pnpm-lock.yaml'
       - '.github/workflows/fleet-config.yml'
 
 concurrency:

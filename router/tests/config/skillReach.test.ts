@@ -1,6 +1,6 @@
 // HAR-22: validate:fleet check 10. Every skill file is one the router can select, or
 // is listed in NOT_ROUTER_SELECTED with a reason. Fakes test each rule; the last
-// block runs the real repo.
+// block runs the real repo, in both directions (check 5 too, since HAR-25).
 
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -43,6 +43,19 @@ describe('the real repo', () => {
   const agents = readdirSync(join(repoRoot, 'agents'), { withFileTypes: true })
     .filter((d) => d.isDirectory() && existsSync(join(repoRoot, 'agents', d.name, 'skills')))
     .map((d) => d.name as AgentId);
+
+  // Check 5, the other direction: every skill the router can select has a file. It
+  // lives in validate:fleet too; this copy makes ci.yml catch it as well (HAR-25).
+  it('every skill the router can select has a file', () => {
+    for (const agent of agents) {
+      for (const skill of resolvableSkills(agent)) {
+        expect(
+          existsSync(join(repoRoot, 'agents', agent, 'skills', `${skill}.md`)),
+          `${agent}: ${skill}`,
+        ).toBe(true);
+      }
+    }
+  });
 
   it('every skill file is reachable or deliberately not', () => {
     expect(agents.length).toBe(7);

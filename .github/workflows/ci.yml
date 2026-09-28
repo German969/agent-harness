@@ -15,12 +15,18 @@ on:
       - 'router/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/deploy.yml'
+      # fleet-config's own paths are guarded by a vitest test (HAR-25), so a change
+      # to that workflow alone has to run this one.
+      - '.github/workflows/fleet-config.yml'
   push:
     branches: [main]
     paths:
       - 'router/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/deploy.yml'
+      # fleet-config's own paths are guarded by a vitest test (HAR-25), so a change
+      # to that workflow alone has to run this one.
+      - '.github/workflows/fleet-config.yml'
   workflow_call: {}
 
 concurrency:
