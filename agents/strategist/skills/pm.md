@@ -81,7 +81,7 @@ This skill produces **per-feature PRDs** — one feature at a time, with accepta
    - Backend and frontend tickets are **parallel** in contract-first mode (not `blocked-by` each other).
    - If the feature has a Phase-0 parent feature ticket, link these as sub-issues to that parent.
    - **Apply labels per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol)**: every implementation ticket gets:
-     - Type: `feature` (or `bug` for triage-driven fix tickets)
+     - Type: `Feature` (or `Bug` for triage-driven fix tickets)
      - Area: `backend` for server-bot tickets, `frontend` for client-bot tickets, `mobile` for mobile work
      - Conditional activators: `needs-contract` on backend tickets when the feature has an API surface (triggers Builder-Server's `contract-design` skill); `needs-design` on frontend tickets when UI work has no design yet (triggers Builder-Client's `claude-design-prefill` skill)
      - Skill-specific labels: `ai` for AI-feature tickets, `data-engineer` for data-pipeline work. Both route to Builder-Server and start `ai-specialist` and `data-engineer` respectively. The router resolves one skill per session, from the first of the ticket's labels that selects one (PROTOCOLS.md §5)

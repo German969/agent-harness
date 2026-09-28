@@ -42,7 +42,7 @@ description: Performance regression detection — pattern-based scan (N+1 querie
 ## Label conventions
 
 When creating tickets per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
-- Type: `bug` (regression) or `chore` (optimization)
+- Type: `Bug` (regression) or `Improvement` (optimization)
 - Area: relevant (`backend` / `frontend` / `mobile`)
 - `perf` (activates relevant agent's perf-skill consciousness)
 - Severity: based on user impact (P0 if outage-level; P2 typical)

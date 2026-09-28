@@ -54,7 +54,7 @@ Infra changes follow the **Builder-Server development cycle** (Plan → Implemen
 
 When creating tickets, apply labels per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
 - `devops` — always (routes a follow-up to Platform, which starts this skill)
-- Type: `chore` for routine infra maintenance; `feature` for new infra capabilities; `bug` for infra defects
+- Type: `Improvement` for routine infra maintenance; `Feature` for new infra capabilities; `Bug` for infra defects
 - `complex-deploy` — when the deploy plan is non-routine (multi-step, requires sequencing, has observability checks between steps)
 
 ## Outputs

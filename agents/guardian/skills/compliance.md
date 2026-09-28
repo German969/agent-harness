@@ -50,7 +50,7 @@ description: GDPR / SOC2 / HIPAA / PCI / regional compliance review. Auto-fires 
 ## Label conventions
 
 When creating tickets per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
-- Type: `bug` (compliance defect) or `feature` (new compliance capability)
+- Type: `Bug` (compliance defect) or `Feature` (new compliance capability)
 - Area: `compliance` + the relevant code area
 - `legal-review` (always — compliance findings typically need legal sign-off before remediation merges)
 - Severity: based on regulatory exposure (P0 for critical leak; P2 typical)

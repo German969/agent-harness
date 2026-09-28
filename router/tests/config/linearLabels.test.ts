@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { loadRoutingFacts } from '../../src/config/linearLabelFacts.js';
+import { loadAgentDocs, loadRoutingFacts } from '../../src/config/linearLabelFacts.js';
 import {
   BEGIN_MARKER,
   END_MARKER,
@@ -19,6 +19,7 @@ import {
   parseLabelDescriptions,
   renderLabelTables,
   routingMap,
+  staleLabelMentions,
   withGeneratedBlock,
 } from '../../src/config/linearLabels.js';
 
@@ -70,6 +71,53 @@ describe('parseLabelDescriptions', () => {
     );
     expect(all).toMatch(/`version` must be 1/);
     expect(all).toMatch(/`conventions` is missing/);
+  });
+});
+
+describe('retired labels and stale mentions (HAR-24)', () => {
+  const withRetired = (retired: string) =>
+    `${yaml(OK_ROUTING, '  benchmark: "b"', '  Bug: "c"\n  Improvement: "i"')}retired:\n${retired}\n`;
+
+  it('parses a retired name that points at a label in the file', () => {
+    expect(parsed(withRetired('  chore: Improvement')).retired.get('chore')).toBe('Improvement');
+  });
+
+  it('rejects a retired name pointing at nothing, one that is still a label, an empty target, and case twins', () => {
+    const all = parseLabelDescriptions(
+      withRetired(
+        '  chore: Nowhere\n  Bug: Improvement\n  docs: ""\n  improvement: Bug\n  Chore: Improvement',
+      ),
+    ).problems.join('\n');
+    expect(all).toMatch(/retired 'chore' points at 'Nowhere', which is not a label/);
+    expect(all).toMatch(/retired 'Bug' is also listed under `conventions`/);
+    expect(all).toMatch(/retired 'docs' names no label to use instead/);
+    expect(all).toMatch(
+      /retired 'improvement' is also listed under `conventions` \(names compare case-insensitively\)/,
+    );
+    expect(all).toMatch(/retired 'Chore' and 'chore' differ only in case; keep one/);
+  });
+
+  const d = parsed(withRetired('  chore: Improvement'));
+
+  it('flags a retired name and a label in the wrong case, with the line', () => {
+    const text = 'intro\n- Type: `bug` or `chore`\n- Area: `PRD`';
+    expect(staleLabelMentions(d, 'agents/x.md', text)).toEqual([
+      expect.stringMatching(/^agents\/x\.md:2: `bug` should be `Bug`/),
+      expect.stringMatching(/^agents\/x\.md:2: `chore` is not a Linear label.*use `Improvement`/),
+      expect.stringMatching(/^agents\/x\.md:3: `PRD` should be `prd`/),
+    ]);
+  });
+
+  it('flags a retired name in any case', () => {
+    expect(staleLabelMentions(d, 'agents/x.md', '`Chore` and `CHORE`')).toEqual([
+      expect.stringMatching(/`Chore` is not a Linear label.*use `Improvement`/),
+      expect.stringMatching(/`CHORE` is not a Linear label.*use `Improvement`/),
+    ]);
+  });
+
+  it('passes correct labels and backticked words that are not labels', () => {
+    const text = 'Type: `Bug` or `Improvement`; route with `prd`; run `pnpm test`; see `bugfix.ts`';
+    expect(staleLabelMentions(d, 'agents/x.md', text)).toEqual([]);
   });
 });
 
@@ -255,6 +303,14 @@ describe('the real repo', () => {
   it('PROTOCOLS.md §5 carries exactly the generated tables', () => {
     const doc = readFileSync(join(repoRoot, PROTOCOLS_PATH), 'utf-8');
     expect(generatedBlockProblems(doc, renderLabelTables(descriptions as never, real))).toEqual([]);
+  });
+
+  it('no agent doc names a retired label, or a label in the wrong case', () => {
+    const docs = loadAgentDocs(repoRoot);
+    expect(docs.length).toBeGreaterThan(50);
+    expect(
+      docs.flatMap(({ path, text }) => staleLabelMentions(descriptions as never, path, text)),
+    ).toEqual([]);
   });
 
   it('no routing label is claimed by two agents (the design collision stays fixed)', () => {

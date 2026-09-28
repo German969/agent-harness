@@ -66,7 +66,7 @@ active-skill context. Until that mapping existed the router resolved those event
 - Acknowledge the suggestion.
 - **Open a follow-up Linear ticket** and link to it from the comment thread.
 - **Don't expand the PR's scope.** Suggestions become future work, not surprise additions.
-- **Apply labels** per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol): inherit area (`backend`) + type (`feature` / `chore` / `bug` depending on the suggestion's nature). If the suggestion's scope is non-trivial, add `prd` to route through Strategist's PM skill for a proper write-up.
+- **Apply labels** per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol): inherit area (`backend`) + type (`Feature` / `Improvement` / `Bug` depending on the suggestion's nature). If the suggestion's scope is non-trivial, add `prd` to route through Strategist's PM skill for a proper write-up.
 
 ### Human push to the agent's branch
 

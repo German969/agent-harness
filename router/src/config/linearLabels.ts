@@ -31,6 +31,8 @@ export type LabelDescriptions = {
   routing: Map<string, string>;
   modifiers: Map<string, string>;
   conventions: Map<string, string>;
+  /** Names that are not labels in the workspace → the label to use instead (HAR-24). */
+  retired: Map<string, string>;
 };
 
 /** What the generator needs from the router, injected so tests can supply fakes. */
@@ -59,7 +61,7 @@ export function parseLabelDescriptions(text: string): {
   }
   if (!isRecord(doc)) return { problems: [`${LABELS_PATH}: top level must be a mapping`] };
   for (const key of Object.keys(doc)) {
-    if (key !== 'version' && !(SECTIONS as readonly string[]).includes(key)) {
+    if (key !== 'version' && key !== 'retired' && !(SECTIONS as readonly string[]).includes(key)) {
       at(`unknown top-level key \`${key}\``);
     }
   }
@@ -96,7 +98,71 @@ export function parseLabelDescriptions(text: string): {
       map.set(label, description.trim());
     }
   }
+  out.retired = new Map();
+  const retired = doc.retired;
+  if (retired !== undefined && !isRecord(retired)) {
+    at('`retired` must be a mapping of name → the label to use instead');
+  } else if (retired !== undefined) {
+    const seenLower = new Map([...seen].map(([label, section]) => [label.toLowerCase(), section]));
+    const retiredLower = new Map<string, string>();
+    for (const [name, instead] of Object.entries(retired)) {
+      // Two entries differing only in case would collapse in the scanner's lookup,
+      // and which replacement it reports would depend on key order.
+      const twin = retiredLower.get(name.toLowerCase());
+      if (twin !== undefined) at(`retired '${name}' and '${twin}' differ only in case; keep one`);
+      retiredLower.set(name.toLowerCase(), name);
+      // Case-insensitive: the scanner matches retired names that way, so a retired
+      // `bug` would shadow the live `Bug`.
+      const clash = seenLower.get(name.toLowerCase());
+      if (clash)
+        at(
+          `retired '${name}' is also listed under \`${clash}\` (names compare case-insensitively)`,
+        );
+      if (typeof instead !== 'string' || instead.trim() === '') {
+        at(`retired '${name}' names no label to use instead`);
+        continue;
+      }
+      if (!seen.has(instead.trim())) {
+        at(`retired '${name}' points at '${instead}', which is not a label in this file`);
+      }
+      out.retired.set(name, instead.trim());
+    }
+  }
   return { descriptions: out, problems };
+}
+
+/**
+ * Label names in an agent doc that are not labels in the workspace (HAR-24). Label
+ * names are case-sensitive in Linear, and an agent follows its skill literally: a
+ * skill that says to apply `bug` applies a label that does not exist. Flags a
+ * backticked name that is retired, or that matches a known label in all but case.
+ * Only backticked names: a doc that has to mention a wrong name, to explain the rule,
+ * quotes it plainly and is left alone.
+ */
+export function staleLabelMentions(d: LabelDescriptions, path: string, text: string): string[] {
+  const known = new Map<string, string>();
+  for (const section of [d.routing, d.modifiers, d.conventions]) {
+    for (const label of section.keys()) known.set(label.toLowerCase(), label);
+  }
+  // Retired names match in any case: `Chore` is no more a label than `chore`.
+  const retired = new Map([...d.retired].map(([name, instead]) => [name.toLowerCase(), instead]));
+  const problems: string[] = [];
+  text.split('\n').forEach((line, i) => {
+    for (const [, name] of line.matchAll(/`([^`\s]+)`/g)) {
+      const instead = retired.get((name as string).toLowerCase());
+      const label = known.get((name as string).toLowerCase());
+      if (instead) {
+        problems.push(
+          `${path}:${i + 1}: \`${name}\` is not a Linear label in this workspace; use \`${instead}\` (${LABELS_PATH} → retired)`,
+        );
+      } else if (label && label !== name) {
+        problems.push(
+          `${path}:${i + 1}: \`${name}\` should be \`${label}\`. Linear label names are case-sensitive`,
+        );
+      }
+    }
+  });
+  return problems;
 }
 
 /** The label → agent map as the router builds it, plus every collision. */

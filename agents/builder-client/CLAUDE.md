@@ -242,7 +242,7 @@ Three checklists — code, visual, a11y.
   - a11y notes (axe summary, any known gaps)
   - Risk + rollback if applicable
 - Target branch: project default
-- Labels: `agent:client-bot`, `frontend` (or `mobile`), `feature`/`bug` per the Linear Labels Protocol
+- Labels: `agent:client-bot`, `frontend` (or `mobile`), `Feature`/`Bug` per the Linear Labels Protocol
 
 **Update**: same as Builder-Server — push to existing branch, comment describing what changed, re-request review if needed. **If visuals changed, post updated screenshots.**
 

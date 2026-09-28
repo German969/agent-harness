@@ -66,7 +66,7 @@ Same procedure as Builder-Server's `pr-feedback` — distinguish flake from real
 ### Out-of-scope suggestion
 
 - Acknowledge the suggestion
-- **Open a follow-up Linear ticket** and link to it from the comment thread. Apply labels per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol): type (`feature`/`chore`), area `frontend`, plus `needs-design` if the follow-up needs design work first.
+- **Open a follow-up Linear ticket** and link to it from the comment thread. Apply labels per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol): type (`Feature`/`Improvement`), area `frontend`, plus `needs-design` if the follow-up needs design work first.
 - **Don't expand the PR's scope.**
 
 ### Human push to the agent's branch

@@ -1,7 +1,8 @@
 // Reads the real repo into the `RoutingFacts` linearLabels.ts needs. Kept apart from
 // linearLabels.ts so that module stays pure and testable with fakes.
 
-import { join } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { loadIdentities } from '../routing/loader.js';
 import { labelSkills, workDefaultSkill } from '../routing/skill.js';
 import type { AgentId } from '../types.js';
@@ -33,4 +34,20 @@ export function loadRoutingFacts(repoRoot: string): { facts: RoutingFacts; error
     },
     errors: errors.map((e) => `identities/${e.file}: ${e.reason}`),
   };
+}
+
+/** Every markdown file under agents/, repo-relative, with its text: what an agent reads. */
+export function loadAgentDocs(repoRoot: string): Array<{ path: string; text: string }> {
+  const out: Array<{ path: string; text: string }> = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile() && entry.name.endsWith('.md')) {
+        out.push({ path: relative(repoRoot, full), text: readFileSync(full, 'utf-8') });
+      }
+    }
+  };
+  walk(join(repoRoot, 'agents'));
+  return out.sort((a, b) => a.path.localeCompare(b.path));
 }

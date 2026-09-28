@@ -260,7 +260,7 @@ docs PR the human reviews. This is the exact flow the founding docs already land
      ```
    - **Labels** per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
      - `mvp` (workflow — marks this as part of MVP scope)
-     - `feature` (type)
+     - `Feature` (type)
      - Milestone label (e.g. `milestone-1`)
      - Area hint based on ownership hypothesis: `backend`, `frontend`, or both
      - When the PM skill picks up this ticket later to draft the full PRD, additional labels (`needs-contract`, `needs-design`, `ai`, `data-engineer`, etc.) get added at that point per PM-skill conventions

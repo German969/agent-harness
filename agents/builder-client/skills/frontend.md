@@ -39,7 +39,7 @@ This skill **does not have its own procedure** — it follows the development cy
 ## Label conventions
 
 When creating follow-up tickets (e.g. from PR-review out-of-scope suggestions), apply labels per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
-- Type (`feature` / `bug` / `chore`)
+- Type (`Feature` / `Bug` / `Improvement`)
 - Area: `frontend`
 - `needs-design` if the follow-up needs a design before implementation
 - `a11y` if the follow-up is purely accessibility

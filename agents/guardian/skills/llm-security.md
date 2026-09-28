@@ -78,7 +78,7 @@ Builder-Server's `ai-specialist` writes **functional evals** ("does the LLM do t
 ## Label conventions
 
 When creating tickets per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
-- Type: `bug` (security defect in AI feature)
+- Type: `Bug` (security defect in AI feature)
 - Area: `ai` + `security`
 - Severity: per the rubric above (P0 for verbatim leak / source-code leak / cross-tenant PII / working injection bypassing scope)
 

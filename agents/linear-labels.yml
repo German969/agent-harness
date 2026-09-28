@@ -19,6 +19,8 @@
 #   - a description is empty or over 255 characters (Linear rejects it);
 #   - the generated table in PROTOCOLS.md §5 is not what `pnpm labels:protocols`
 #     would write.
+#   - an agent doc (agents/**/*.md) names a retired label, or a label in the wrong
+#     case, in backticks: `bug` for `Bug` (HAR-24).
 #
 # Labels are team-scoped in Linear; this file is the fleet's list, not any one
 # workspace's inventory. Whether each exists in a given workspace is HAR-8's check.
@@ -114,3 +116,10 @@ conventions:
   breaking-change: "Contract or API breaking change. Applied during a contract change or an ADR for an API shape change."
   mvp: "MVP epic feature ticket. Applied by Strategist founding in Phase 0.6."
   keep-forever: "State, docs or findings routine cleanup must never archive. Applied by Strategist curator or a human."
+
+# Names agent docs used to give as labels that are not labels in the workspace, and
+# the label to use instead (HAR-24). validate:fleet check 9 fails an agent doc that
+# names one in backticks, or that names a label above in the wrong case.
+retired:
+  chore: Improvement
+  documentation: Improvement

@@ -36,17 +36,17 @@ description: First responder for incoming bugs and feature requests. Classifies 
 6. **Normalize labels** per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol). Triage is the **backstop** for under-labeled tickets — particularly tickets humans create through the Linear UI without remembering the agent-system labels.
    
    Check that the ticket has:
-   - **At least one type label** (`bug` / `feature` / `chore` / `documentation`) — required
+   - **At least one type label** (`Bug` / `Feature` / `Improvement`, Linear's built-ins, capitalised) — required
    - **At least one area label** if the ticket is code-related (`backend` / `frontend` / `mobile` / `devops` / `design`) — required for code tickets
-   - **Exactly one severity label** if `bug` (`P0` – `P3`) — required
+   - **Exactly one severity label** if `Bug` (`P0` – `P3`) — required
    - **An activation label** matching the work shape (`prd` / `scope-question` / `research` / `arch` / `devops` / `campaign` / etc. — the routing names in PROTOCOLS.md §5's generated table) — recommended; routes the ticket to the right agent. The §5 table shows which skill each one actually starts
    
    For missing labels: add them with a brief comment explaining why. Example:
-   > "🏷️ Triage label normalization: added `feature` + `backend` + `needs-contract`. This ticket touches the API surface, so Builder-Server's `contract-design` skill should propose a contract before implementation tickets are created."
+   > "🏷️ Triage label normalization: added `Feature` + `backend` + `needs-contract`. This ticket touches the API surface, so Builder-Server's `contract-design` skill should propose a contract before implementation tickets are created."
    
    **Never silently change** existing labels. If a label looks wrong, add a comment proposing the change and tag the appropriate agent or human for confirmation.
    
-   For label conflicts (e.g. both `feature` and `bug`, multiple severities), resolve per the protocol's conflict-resolution rules and explain in the comment.
+   For label conflicts (e.g. both `Feature` and `Bug`, multiple severities), resolve per the protocol's conflict-resolution rules and explain in the comment.
 
 7. **Maintain `dev-team-state/projects/<project>/strategist/triage-known-issues.md`** — recurring patterns ("third report of inverter timeout this week — escalate to the team lead").
 

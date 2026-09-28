@@ -165,7 +165,7 @@ Your decision is **binding for the agents**. Humans can override with new inform
 
 When this skill creates follow-up tickets (e.g. "Implement the refactor that ADR-0023 specifies"), apply labels per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
 
-- Type: `feature` (for new architectural work) or `chore` (for refactors driven by an ADR)
+- Type: `Feature` (for new architectural work) or `Improvement` (for refactors driven by an ADR)
 - Area: based on which Builder owns the work — `backend` / `frontend` / `devops`
 - `arch` — for tickets whose primary purpose is to discuss or implement an architectural decision
 - `breaking-change` — when the ADR introduces an API or contract break

@@ -55,8 +55,8 @@ loaded into this session.
 2. Check existing coverage on the changed code paths. Where coverage drops below the project threshold, flag the specific paths.
 3. Inspect new code for: missing tests on happy + edge + error paths.
 4. For contract-touching changes, verify the integration test exists or is being added in the same PR.
-5. **Write missing tests in low-risk cases** — open a small follow-up PR with tests; tag `agent:guardian-bot`, type `chore`, area as relevant.
-6. **Route substantive missing-test issues to the responsible Builder** — Linear ticket with: area, type `feature` or `bug`, severity if applicable.
+5. **Write missing tests in low-risk cases** — open a small follow-up PR with tests; tag `agent:guardian-bot`, type `Improvement`, area as relevant.
+6. **Route substantive missing-test issues to the responsible Builder** — Linear ticket with: area, type `Feature` or `Bug`, severity if applicable.
 7. Aggregate findings into the unified Guardian review comment.
 
 ## Outputs
@@ -68,7 +68,7 @@ loaded into this session.
 ## Label conventions
 
 When creating tickets for substantive missing-test issues, per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
-- Type: `bug` (broken test) or `chore` (coverage gap)
+- Type: `Bug` (broken test) or `Improvement` (coverage gap)
 - Area: `backend` / `frontend` / `mobile` per the affected code
 
 ## Examples

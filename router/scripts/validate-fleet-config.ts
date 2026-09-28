@@ -40,7 +40,8 @@
 //      agents/linear-labels.yml agrees with the identities and LABEL_SKILLS: every
 //      routing label described, no label routed by two agents, every LABEL_SKILLS[agent]
 //      key either one of that agent's routing labels or a described modifier (HAR-23),
-//      descriptions within Linear's 255 cap.
+//      descriptions within Linear's 255 cap, and no agent doc naming a retired label
+//      or a label in the wrong case (HAR-24).
 //  10. The reverse of 5: every skills/*.md is one the router can select, or is listed
 //      in NOT_ROUTER_SELECTED with a reason. Eleven skill files across five agents
 //      had no selector, label, intent or default reaching them, most while their
@@ -61,7 +62,7 @@ import {
 } from '../src/hooks/registry.js';
 import type { GlobRegistrySpec } from '../src/config/globRegistry.js';
 import { validateGlobRegistryFile } from '../src/config/globRegistry.js';
-import { loadRoutingFacts } from '../src/config/linearLabelFacts.js';
+import { loadAgentDocs, loadRoutingFacts } from '../src/config/linearLabelFacts.js';
 import { skillReachProblems } from '../src/config/skillReach.js';
 import {
   LABELS_PATH,
@@ -70,6 +71,7 @@ import {
   generatedBlockProblems,
   parseLabelDescriptions,
   renderLabelTables,
+  staleLabelMentions,
 } from '../src/config/linearLabels.js';
 import {
   REGISTRY_PATH,
@@ -457,7 +459,8 @@ for (const agent of agents) {
 
 // 9 — the Linear label tables in PROTOCOLS.md §5 are generated from the code, and
 //     the descriptions file agrees with it (HAR-19). §5 used to be a hand-written
-//     "canonical registry" nothing read, and it drifted from the identities.
+//     "canonical registry" nothing read, and it drifted from the identities. Agent
+//     docs may not name a retired label, or a label in the wrong case (HAR-24).
 {
   // Identity load errors are already reported by check 4.
   const { facts } = loadRoutingFacts(repoRoot);
@@ -472,6 +475,9 @@ for (const agent of agents) {
     problems.push(...shape);
     if (descriptions) {
       problems.push(...crossCheckLinearLabels(descriptions, facts));
+      for (const { path, text } of loadAgentDocs(repoRoot)) {
+        problems.push(...staleLabelMentions(descriptions, path, text));
+      }
       try {
         const doc = readFileSync(join(repoRoot, PROTOCOLS_PATH), 'utf-8');
         problems.push(...generatedBlockProblems(doc, renderLabelTables(descriptions, facts)));

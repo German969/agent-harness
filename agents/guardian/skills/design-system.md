@@ -43,7 +43,7 @@ description: Design-system compliance review on UI PRs — token discipline (no 
 ## Label conventions
 
 Tickets routed for substantive design-system work, per the [Linear Labels Protocol](../../PROTOCOLS.md#5-linear-labels-protocol):
-- Type: `chore` (token-system maintenance) or `feature` (new component/token needed)
+- Type: `Improvement` (token-system maintenance) or `Feature` (new component/token needed)
 - Area: `frontend`
 - `design`
 
