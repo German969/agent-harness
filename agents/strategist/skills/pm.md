@@ -84,7 +84,7 @@ This skill produces **per-feature PRDs** — one feature at a time, with accepta
      - Type: `feature` (or `bug` for triage-driven fix tickets)
      - Area: `backend` for server-bot tickets, `frontend` for client-bot tickets, `mobile` for mobile work
      - Conditional activators: `needs-contract` on backend tickets when the feature has an API surface (triggers Builder-Server's `contract-design` skill); `needs-design` on frontend tickets when UI work has no design yet (triggers Builder-Client's `claude-design-prefill` skill)
-     - Skill-specific labels: `ai` for AI-feature tickets, `data-engineer` for data-pipeline work. Both route to Builder-Server, which today starts `backend` for either: the router resolves one skill per session, and neither label selects `ai-specialist` or `data-engineer` (HAR-22; PROTOCOLS.md §5)
+     - Skill-specific labels: `ai` for AI-feature tickets, `data-engineer` for data-pipeline work. Both route to Builder-Server and start `ai-specialist` and `data-engineer` respectively. The router resolves one skill per session, from the first of the ticket's labels that selects one (PROTOCOLS.md §5)
      - Milestone label if part of an MVP epic
 
 6. **If UI work is involved**, chain into the `design-prefill` skill (§5.7) before assigning client work — Builder-Client refuses UI work without a design handoff.

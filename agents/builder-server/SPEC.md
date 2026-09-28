@@ -300,7 +300,7 @@ The full development cycle (§4) applies. This skill provides the *knowledge* us
 ### 5.2 `ai-specialist` — AI / LLM Features
 
 **Triggers**
-- Linear ticket with label `ai` *(intended; today it starts `backend`, HAR-22)*
+- Linear ticket with label `ai`
 - Paths in the diff matching the AI service directory (e.g. `server/services/ai/`, `apps/ai/`, etc. — defined in stack)
 - Files matching `*prompts*`, `*evals*`, `*rag*`, `langchain.config*`
 
@@ -343,7 +343,7 @@ Full cycle (§4). Additions specific to this skill:
 ### 5.3 `data-engineer` — Data Pipelines & Time-Series
 
 **Triggers**
-- Linear ticket with label `data-engineer` *(intended; today it starts `backend`, HAR-22)*
+- Linear ticket with label `data-engineer`
 - Paths in the diff matching `db-series/`, `etl/`, `dbt/`, `pipelines/`, `analytics/`
 - Migration files in the time-series DB
 
@@ -731,7 +731,7 @@ For the router side (`identities/builder-server.yml` + `router/src/routing/skill
   - GitHub `push` event by a non-bot user on an agent-owned branch → `pr-feedback` skill
 - Skill activation keywords:
   - Linear label `ai` → load `ai-specialist`
-  - Linear label `data-engineer` → load `data-engineer` *(intended; today the router starts `backend`, HAR-22)*
+  - Linear label `data-engineer` → load `data-engineer`
   - Default → load `backend`
 
 ## 12. Open questions

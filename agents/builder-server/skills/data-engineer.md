@@ -7,7 +7,7 @@ description: Data pipelines, time-series schemas, dbt-style transformations, ana
 
 ## Activate when
 
-- Linear ticket with label `data-engineer`. *Today this routes to Builder-Server but starts `backend`: the label is not in `LABEL_SKILLS`, and no selector reaches `data-engineer` (HAR-22).*
+- Linear ticket with label `data-engineer`
 - Paths in the diff matching `db-series/`, `etl/`, `dbt/`, `pipelines/`, `analytics/`
 - Migration files affecting time-series or analytics tables (vs. transactional CRUD tables, which `backend` handles)
 

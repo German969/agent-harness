@@ -157,7 +157,7 @@ The point of steps 7–8 is to **surface the ADR where the work happens** (Linea
 **Triggers**
 - CI failure on infra paths (`.github/workflows/**`, `Dockerfile*`, IaC).
 - `@platform-agent` mention for an infra change.
-- Linear `devops` label *(intended; today it starts `architect`, HAR-22)*.
+- Linear `devops` label.
 - A Builder agent reports a CI/infra issue (not a code issue).
 
 **Specialized knowledge this skill provides**
@@ -323,7 +323,7 @@ Infra changes follow the **Builder-Server development cycle** (Plan → Implemen
 **Triggers**
 - **First-time invocation in Phase 3** of the bootstrap (after Phase 0 founding docs land, before any code exists). Detected by SessionStart: founding docs present + no `<target-project>/docs/architecture/SYSTEM.md` exists.
 - Explicit human invocation: `@platform-agent design the system architecture` / `@platform-agent kick off architecture design`.
-- Linear ticket with label `system-design` *(today it starts `architect`; the `design` selector starts this skill, HAR-22)*.
+- Linear ticket with label `system-design`.
 - Explicit re-invocation for a major redesign (rare; expensive): `@platform-agent redesign architecture`.
 
 This skill is **one-time, multi-session, interactive** — analogous to Strategist's `founding` skill. It runs once per project at the start. Subsequent architecture work happens incrementally through `architect` (§5.1).
@@ -580,7 +580,7 @@ For the router side (`identities/platform.yml` + `router/src/routing/skill.ts`):
   - CI failure on infra paths → `devops` skill
   - Monitoring alert webhook → `incident-response` skill (high priority)
   - Cron: release cadence → `release-manager`; daily/weekly → `finops`
-- Skill selection: the `@platform-agent` selectors are `design` → system-design, `adr` → architect, `cost` → finops, `release` → release-manager, `incident` → incident-response (`AGENT_SKILL_SELECTORS`, router/src/routing/skill.ts). Label routing, and the skill each label starts, is PROTOCOLS.md §5's generated table; no selector or label reaches `devops` today (HAR-22).
+- Skill selection: the `@platform-agent` selectors are `design` → system-design, `adr` → architect, `cost` → finops, `release` → release-manager, `incident` → incident-response (`AGENT_SKILL_SELECTORS`, router/src/routing/skill.ts). Label routing, and the skill each label starts, is PROTOCOLS.md §5's generated table; `devops` has no selector and is started by its label.
 
 ## 12. Open questions
 

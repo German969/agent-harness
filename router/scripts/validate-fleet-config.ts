@@ -41,6 +41,10 @@
 //      routing label described, no label routed by two agents, every LABEL_SKILLS[agent]
 //      key either one of that agent's routing labels or a described modifier (HAR-23),
 //      descriptions within Linear's 255 cap.
+//  10. The reverse of 5: every skills/*.md is one the router can select, or is listed
+//      in NOT_ROUTER_SELECTED with a reason. Eleven skill files across five agents
+//      had no selector, label, intent or default reaching them, most while their
+//      docs promised a Linear label did (HAR-22).
 //
 // Exits non-zero listing every problem found, rather than stopping at the first:
 // fixing config one CI run at a time is how a five-minute edit becomes an hour.
@@ -58,6 +62,7 @@ import {
 import type { GlobRegistrySpec } from '../src/config/globRegistry.js';
 import { validateGlobRegistryFile } from '../src/config/globRegistry.js';
 import { loadRoutingFacts } from '../src/config/linearLabelFacts.js';
+import { skillReachProblems } from '../src/config/skillReach.js';
 import {
   LABELS_PATH,
   PROTOCOLS_PATH,
@@ -73,7 +78,7 @@ import {
   parseLabelRegistry,
 } from '../src/config/prLabels.js';
 import { loadIdentities } from '../src/routing/loader.js';
-import { resolvableSkills } from '../src/routing/skill.js';
+import { NOT_ROUTER_SELECTED, resolvableSkills } from '../src/routing/skill.js';
 import { auditFleetModels } from '../src/runtime/modelCheck.js';
 import { builtinToolsFrom } from '../src/runtime/toolAllowlist.js';
 import type { AgentId } from '../src/types.js';
@@ -491,6 +496,19 @@ for (const agent of agents) {
   }
 }
 
+// 10 — every skill file is one the router can select, or is deliberately not.
+for (const agent of agents) {
+  const dir = join(repoRoot, 'agents', agent, 'skills');
+  const files = existsSync(dir)
+    ? readdirSync(dir)
+        .filter((f) => f.endsWith('.md'))
+        .map((f) => f.slice(0, -3))
+    : [];
+  problems.push(
+    ...skillReachProblems(agent, files, resolvableSkills(agent), NOT_ROUTER_SELECTED[agent] ?? {}),
+  );
+}
+
 if (problems.length > 0) {
   console.error(`fleet config invalid — ${problems.length} problem(s):\n`);
   for (const p of problems) console.error(`  - ${p}`);
@@ -498,5 +516,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file, every agent sees the vault index, both guardian glob registries well-formed, PR label registry matches the hooks, §5 Linear label tables current`,
+  `fleet config ok — ${agents.length} agents, ${identities.length} identities, all models priced, every allow entry names a declared server, every resolvable skill has a file and every skill file is reachable, every agent sees the vault index, both guardian glob registries well-formed, PR label registry matches the hooks, §5 Linear label tables current`,
 );

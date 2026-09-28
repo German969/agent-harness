@@ -145,10 +145,10 @@ describe('resolveSkill — Linear labels select only the routed agent’s skills
   // carried `campaign` started campaign-lead.
   it.each([
     // [agent, labels, expected skill]
-    ['guardian', ['security', 'campaign'], 'qa'],
-    ['guardian', ['security', 'prd', 'router-change'], 'qa'],
+    ['guardian', ['security', 'campaign'], 'security'],
+    ['guardian', ['qa', 'prd', 'router-change'], 'qa'],
     ['builder-server', ['backend', 'prd'], 'backend'],
-    ['platform', ['devops', 'new-agent'], 'architect'],
+    ['platform', ['adr', 'new-agent'], 'architect'],
     ['marketer', ['campaign', 'prd'], 'campaign-lead'],
     ['strategist', ['prd', 'campaign', 'content'], 'pm'],
     ['harness', ['router-change', 'prd'], 'router-engineer'],
@@ -174,10 +174,10 @@ describe('resolveSkill — Linear labels select only the routed agent’s skills
 
   it('a modifier selects only for its agent', () => {
     expect(
-      resolveSkill('marketer', linear(['growth', 'benchmark']), { reason: 'linear_label' }),
+      resolveSkill('marketer', linear(['marketer-bot', 'benchmark']), { reason: 'linear_label' }),
     ).toBe('benchmarking');
     expect(
-      resolveSkill('guardian', linear(['security', 'benchmark']), { reason: 'linear_label' }),
+      resolveSkill('guardian', linear(['guardian-bot', 'benchmark']), { reason: 'linear_label' }),
     ).toBe('qa');
   });
 
@@ -206,5 +206,53 @@ describe('resolveSkill — Linear labels select only the routed agent’s skills
     for (const label of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
       expect(resolveSkill('guardian', linear([label]), { reason: 'linear_label' })).toBe('qa');
     }
+  });
+});
+
+describe('resolveSkill — every routing label starts the skill it names (HAR-22)', () => {
+  // Six Strategist labels started `conversational`, the Haiku lookup skill, and ten
+  // skill files across the fleet had no label or selector reaching them at all.
+  it.each([
+    ['strategist', 'scope-question', 'ba'],
+    ['strategist', 'support-feedback', 'triage'],
+    ['strategist', 'research', 'researcher'],
+    ['strategist', 'status-question', 'pjm'],
+    ['strategist', 'curate', 'curator'],
+    ['strategist', 'design-prefill', 'design-prefill'],
+    ['platform', 'devops', 'devops'],
+    ['platform', 'system-design', 'system-design'],
+    ['builder-server', 'ai', 'ai-specialist'],
+    ['builder-server', 'data-engineer', 'data-engineer'],
+    ['builder-client', 'mobile', 'mobile'],
+    ['marketer', 'social', 'social-community'],
+    ['marketer', 'email', 'email-lifecycle'],
+    ['marketer', 'pr', 'pr-brand-steward'],
+    ['marketer', 'growth', 'growth-analyst'],
+  ] as const)('%s + %s → %s', (agent, label, skill) => {
+    expect(resolveSkill(agent, linear([label]), { reason: 'linear_label' })).toBe(skill);
+  });
+
+  it('every LABEL_SKILLS entry is what the resolver returns for that agent', () => {
+    for (const agent of [
+      'strategist',
+      'platform',
+      'builder-server',
+      'builder-client',
+      'guardian',
+      'marketer',
+      'harness',
+    ] as const) {
+      for (const [label, skill] of Object.entries(labelSkills(agent))) {
+        expect(resolveSkill(agent, linear([label]), { reason: 'linear_label' }), label).toBe(skill);
+      }
+    }
+  });
+
+  it('labels left to the work default still start it', () => {
+    expect(resolveSkill('platform', linear(['adr']), { reason: 'linear_label' })).toBe('architect');
+    expect(resolveSkill('builder-server', linear(['api']), { reason: 'linear_label' })).toBe(
+      'backend',
+    );
+    expect(resolveSkill('guardian', linear(['qa']), { reason: 'linear_label' })).toBe('qa');
   });
 });

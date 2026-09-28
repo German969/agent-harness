@@ -601,7 +601,7 @@ Labels are team-scoped in Linear (each workspace has its own set). The tables be
 **Where each fact lives.** Nothing reads this section; the router reads code. So these tables are **generated from the code**, and `validate:fleet` (check 9) fails if they fall out of date:
 
 - **Which labels route, and to which agent:** `routing.linear_labels` in `identities/*.yml`, the only thing the router reads (`routing/registry.ts`). Names match **exactly**, case included.
-- **Which skill a routed ticket starts:** `LABEL_SKILLS` in `routing/skill.ts`, keyed by agent. Only the routed agent's own entries are read, so another agent's label on the same ticket never picks the skill (HAR-23). When none of the ticket's labels is in the agent's entries, it starts the agent's **work default**, and that agent's CLAUDE.md then picks the specific procedure.
+- **Which skill a routed ticket starts:** `LABEL_SKILLS` in `routing/skill.ts`, keyed by agent. Only the routed agent's own entries are read, so another agent's label on the same ticket never picks the skill (HAR-23). When none of the ticket's labels is in the agent's entries, it starts the agent's **work default**. Every routing label whose identity file names one skill has an entry (HAR-22), so the work default is what a label like `adr` or `backend` is meant to start, not a gap.
 - **What each label is for:** `agents/linear-labels.yml`. It holds descriptions only; it adds no routing.
 
 To change a label, edit the identity file (routing), `LABEL_SKILLS` (skill) or `agents/linear-labels.yml` (description), then run `pnpm labels:protocols` from `router/` and commit the regenerated tables. Check 9 also fails when an identity and the descriptions file disagree, when two agents declare the same routing label, or when an agent's `LABEL_SKILLS` entry is keyed on a label that routes to a different agent.
@@ -617,58 +617,58 @@ This replaced a hand-written "canonical registry" that had drifted from both sou
 | Label | Routes to | Starts skill | What it is for |
 |---|---|---|---|
 | `prd` | Strategist | `pm` | Needs a per-feature PRD with acceptance criteria. Applied by a human at creation, or by Strategist triage on classification. |
-| `scope-question` | Strategist | `conversational` (work default) | A scoping or quantitative question: ROI, conversion, segment or gap analysis. Applied by a human or Strategist triage. |
-| `support-feedback` | Strategist | `conversational` (work default) | Incoming bug or request to classify, reproduce, structure and route. Applied by a human or on intake. |
-| `research` | Strategist | `conversational` (work default) | Needs a decision-ready brief on a technology, library, vendor or question. The brief refuses to start without a defined decision. |
-| `status-question` | Strategist | `conversational` (work default) | Status report, dependency tracking, risk and blocker flagging. Applied by a human. |
-| `curate` | Strategist | `conversational` (work default) | Docs-vs-code drift sweep, sensitive-paths backstop (§2), weekly Product-Marketing sync (§3). Applied by a human. |
-| `design-prefill` | Strategist | `conversational` (work default) | UI work with no design yet: produce a paste-ready Claude Design prompt. Applied by Strategist pm on a UI-touching PRD. |
+| `scope-question` | Strategist | `ba` | A scoping or quantitative question: ROI, conversion, segment or gap analysis. Applied by a human or Strategist triage. |
+| `support-feedback` | Strategist | `triage` | Incoming bug or request to classify, reproduce, structure and route. Applied by a human or on intake. |
+| `research` | Strategist | `researcher` | Needs a decision-ready brief on a technology, library, vendor or question. The brief refuses to start without a defined decision. |
+| `status-question` | Strategist | `pjm` | Status report, dependency tracking, risk and blocker flagging. Applied by a human. |
+| `curate` | Strategist | `curator` | Docs-vs-code drift sweep, sensitive-paths backstop (§2), weekly Product-Marketing sync (§3). Applied by a human. |
+| `design-prefill` | Strategist | `design-prefill` | UI work with no design yet: produce a paste-ready Claude Design prompt. Applied by Strategist pm on a UI-touching PRD. |
 | `founding` | Strategist | `founding` | Phase 0: founding docs, MVP scope, milestones, feature tickets. Rare; Phase 0 usually starts in Slack. |
 | `arch` | Platform | `architect` (work default) | An architectural question that needs an ADR. Applied by any agent or human raising it. |
 | `adr` | Platform | `architect` (work default) | Author an Architecture Decision Record. Platform updates docs/architecture/SYSTEM.md in the same PR as a materially architectural ADR. |
-| `system-design` | Platform | `architect` (work default) | Phase 3 whole-system design. Applied by a human, rarely; usually invoked by Slack mention. |
-| `release` | Platform | `architect` (work default) | Release management. Applied by cron on the release cadence, or by a human on demand. |
-| `finops` | Platform | `architect` (work default) | Spend tracking, cost-cap alerting, model-rate drift. Applied by cron or a human. |
-| `incident` | Platform | `architect` (work default) | Production degraded or down. Applied by any agent or human; pair with a severity label (P0 = down, data loss, or customer-visible exposure). |
-| `devops` | Platform | `architect` (work default) | Infra change, CI/CD, provider config. Applied by any agent or human. |
-| `cost-signoff` | Platform | `architect` (work default) | Work that needs explicit spend approval before proceeding. Applied by any agent whose change adds recurring cost. |
+| `system-design` | Platform | `system-design` | Phase 3 whole-system design. Applied by a human, rarely; usually invoked by Slack mention. |
+| `release` | Platform | `release-manager` | Release management. Applied by cron on the release cadence, or by a human on demand. |
+| `finops` | Platform | `finops` | Spend tracking, cost-cap alerting, model-rate drift. Applied by cron or a human. |
+| `incident` | Platform | `incident-response` | Production degraded or down. Applied by any agent or human; pair with a severity label (P0 = down, data loss, or customer-visible exposure). |
+| `devops` | Platform | `devops` | Infra change, CI/CD, provider config. Applied by any agent or human. |
+| `cost-signoff` | Platform | `finops` | Work that needs explicit spend approval before proceeding. Applied by any agent whose change adds recurring cost. |
 | `backend` | Builder-Server | `backend` (work default) | Backend-area work. Applied by Strategist pm at PRD decomposition, or by Strategist triage. |
 | `api` | Builder-Server | `backend` (work default) | API-surface work. A feature with an API boundary also needs a contract designed during planning (§1). |
-| `needs-contract` | Builder-Server | `backend` (work default) | The feature has an API boundary: propose the contract before implementation tickets exist (§1). Applied by Strategist pm at PRD drafting. |
-| `ai` | Builder-Server | `backend` (work default) | LLM, prompt or eval work. Applied by Strategist pm at PRD decomposition, or by Guardian on llm-security findings. |
-| `data-engineer` | Builder-Server | `backend` (work default) | Pipelines, ingestion, ETL. Applied by Strategist pm or a human. |
+| `needs-contract` | Builder-Server | `contract-design` | The feature has an API boundary: propose the contract before implementation tickets exist (§1). Applied by Strategist pm at PRD drafting. |
+| `ai` | Builder-Server | `ai-specialist` | LLM, prompt or eval work. Applied by Strategist pm at PRD decomposition, or by Guardian on llm-security findings. |
+| `data-engineer` | Builder-Server | `data-engineer` | Pipelines, ingestion, ETL. Applied by Strategist pm or a human. |
 | `migration` | Builder-Server | `backend` (work default) | Schema-migration work. Additive-first, CI-gated, never auto-run on prod without manual approval (founding/STACK.md; ADR-0010). |
 | `server-bot` | Builder-Server | `backend` (work default) | Explicit routing to Builder-Server when no area label fits. Not the GitHub PR-owner label `agent:server-bot`. |
 | `frontend` | Builder-Client | `frontend` (work default) | Frontend-area work. Applied by Strategist pm at PRD decomposition, or by Strategist triage. |
 | `design` | Builder-Client | `frontend` (work default) | Design-touching work. Applied by Strategist pm or triage. |
-| `mobile` | Builder-Client | `frontend` (work default) | Mobile-area work. Applied by Strategist pm or a human at ticket creation. |
-| `a11y` | Builder-Client | `frontend` (work default) | Accessibility audit or fix. Applied by a human requesting an audit, or by Guardian when raising accessibility findings. |
-| `screenshot` | Builder-Client | `frontend` (work default) | Capture product screenshots for the shared library (§4). Applied by a human or by Marketer requesting collateral. |
-| `needs-design` | Builder-Client | `frontend` (work default) | UI work with no design yet. Applied by Strategist pm when drafting a UI-touching PRD; Builders refuse UI work without a design handoff. |
+| `mobile` | Builder-Client | `mobile` | Mobile-area work. Applied by Strategist pm or a human at ticket creation. |
+| `a11y` | Builder-Client | `a11y` | Accessibility audit or fix. Applied by a human requesting an audit, or by Guardian when raising accessibility findings. |
+| `screenshot` | Builder-Client | `screenshots` | Capture product screenshots for the shared library (§4). Applied by a human or by Marketer requesting collateral. |
+| `needs-design` | Builder-Client | `claude-design-prefill` | UI work with no design yet. Applied by Strategist pm when drafting a UI-touching PRD; Builders refuse UI work without a design handoff. |
 | `client-bot` | Builder-Client | `frontend` (work default) | Explicit routing to Builder-Client when no area label fits. Not the GitHub PR-owner label `agent:client-bot`. |
-| `security` | Guardian | `qa` (work default) | Security-touching work. Applied by Guardian when raising findings, and by Strategist triage. |
+| `security` | Guardian | `security` | Security-touching work. Applied by Guardian when raising findings, and by Strategist triage. |
 | `qa` | Guardian | `qa` (work default) | Test-coverage review and path-tier scan. Guardian also auto-fires on pull requests without this label. |
-| `perf` | Guardian | `qa` (work default) | Performance work. Applied by a human, by Guardian when raising findings, or by Strategist triage on a perf bug. |
-| `compliance` | Guardian | `qa` (work default) | Compliance-touching (PII / GDPR / SOC2 / sub-processors). Applied by Guardian and Strategist triage. |
-| `llm-security` | Guardian | `qa` (work default) | Focused prompt-injection and adversarial red-team review. Applied by a human or Guardian. |
-| `legal-review` | Guardian | `qa` (work default) | Needs legal review before merge or publish. Applied by Guardian compliance and Marketer pr-brand-steward. |
-| `threat-model` | Guardian | `qa` (work default) | A focused threat model, distinct from a general security review. Applied when a change alters the attack surface. |
+| `perf` | Guardian | `performance` | Performance work. Applied by a human, by Guardian when raising findings, or by Strategist triage on a perf bug. |
+| `compliance` | Guardian | `compliance` | Compliance-touching (PII / GDPR / SOC2 / sub-processors). Applied by Guardian and Strategist triage. |
+| `llm-security` | Guardian | `llm-security` | Focused prompt-injection and adversarial red-team review. Applied by a human or Guardian. |
+| `legal-review` | Guardian | `compliance` | Needs legal review before merge or publish. Applied by Guardian compliance and Marketer pr-brand-steward. |
+| `threat-model` | Guardian | `security` | A focused threat model, distinct from a general security review. Applied when a change alters the attack surface. |
 | `guardian-bot` | Guardian | `qa` (work default) | Explicit routing to Guardian when no security/qa/perf/compliance label fits. Not the GitHub PR-owner label `agent:guardian-bot`. |
 | `campaign` | Marketer | `campaign-lead` | A marketing campaign brief. Applied by a human, or by Strategist when handing off a launch. |
 | `content` | Marketer | `content-writer` | A content piece, one-off or from a campaign breakdown. Applied by a human or Marketer campaign-lead. |
-| `social` | Marketer | `campaign-lead` (work default) | Social and community work. Applied by cron, a human, or Marketer campaign-lead. |
-| `email` | Marketer | `campaign-lead` (work default) | Email and lifecycle work. Applied by a human or Marketer campaign-lead. |
-| `pr` | Marketer | `campaign-lead` (work default) | Press / PR-touching work. Applied by a human. |
-| `brand` | Marketer | `campaign-lead` (work default) | Brand-voice review. Applied by a human. |
-| `growth` | Marketer | `campaign-lead` (work default) | Growth analytics request. Applied by a human, or by Marketer after a campaign. |
-| `competitive-intel` | Marketer | `campaign-lead` (work default) | Competitor research and benchmarking. Applied by a human or on the benchmarking cadence. |
-| `marketing-asset` | Marketer | `campaign-lead` (work default) | A creative brief for a marketing asset. Applied by a human or Marketer campaign-lead. |
+| `social` | Marketer | `social-community` | Social and community work. Applied by cron, a human, or Marketer campaign-lead. |
+| `email` | Marketer | `email-lifecycle` | Email and lifecycle work. Applied by a human or Marketer campaign-lead. |
+| `pr` | Marketer | `pr-brand-steward` | Press / PR-touching work. Applied by a human. |
+| `brand` | Marketer | `pr-brand-steward` | Brand-voice review. Applied by a human. |
+| `growth` | Marketer | `growth-analyst` | Growth analytics request. Applied by a human, or by Marketer after a campaign. |
+| `competitive-intel` | Marketer | `benchmarking` | Competitor research and benchmarking. Applied by a human or on the benchmarking cadence. |
+| `marketing-asset` | Marketer | `creative-brief` | A creative brief for a marketing asset. Applied by a human or Marketer campaign-lead. |
 | `marketer-bot` | Marketer | `campaign-lead` (work default) | Explicit routing to Marketer when no marketing label fits. Not the GitHub PR-owner label `agent:marketer-bot`. |
 | `harness` | Harness | `agent-modifier` (work default) | General fleet-tooling work for Harness. Applied by a human. |
 | `agent-improvement` | Harness | `agent-modifier` | Change an existing agent's config, prompts or skills. Applied by a human or an agent reporting a gap. |
 | `agent-misbehavior` | Harness | `misbehavior-debugger` | An agent did something wrong; debug from its session logs. Applied by a human or an agent that observed it. |
 | `meta` | Harness | `agent-modifier` (work default) | Work on the fleet's own process or protocols rather than one agent. Applied by a human. |
-| `gap-analysis` | Harness | `agent-modifier` (work default) | Survey the fleet for a missing capability. Applied by a human. |
+| `gap-analysis` | Harness | `gap-analyzer` | Survey the fleet for a missing capability. Applied by a human. |
 | `new-agent` | Harness | `agent-architect` | Design and add a new agent. Applied by a human. |
 | `new-skill` | Harness | `skill-author` | Add a skill to an existing agent. Applied by a human or the agent that needs it. |
 | `router-change` | Harness | `router-engineer` | Change the router's TypeScript source. Distinct from the GitHub PR label of the same name, which the router applies to router-opened PRs. |

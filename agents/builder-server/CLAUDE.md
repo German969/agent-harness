@@ -398,8 +398,8 @@ Key handoffs:
 |---|---|---|
 | `conversational` | **Default for a bare mention** — a question / lookup / routing with no selector or work trigger | Direct answers, read-only lookups, routing/escalation. Loads only house-style docs (not SYSTEM.md/ADR/coding-practices) so light replies stay cheap. Runs on Haiku |
 | `backend` | Default for a **work trigger** (assigned ticket / PR event) with no specialized tag | Code + tests + migrations following project conventions |
-| `ai-specialist` | *Unreachable by the router today (HAR-22): the `ai` label starts `backend`.* Intended: Linear label `ai`; paths in AI service dirs; prompt/eval files | LLM feature code; prompt evals; cost projections |
-| `data-engineer` | *Unreachable by the router today (HAR-22): the `data-engineer` label starts `backend`.* Intended: Linear label `data-engineer`; paths in `db-series/`, `etl/`, `dbt/` | Data pipeline code; time-series migrations; backfill scripts |
+| `ai-specialist` | Linear label `ai`; paths in AI service dirs; prompt/eval files | LLM feature code; prompt evals; cost projections |
+| `data-engineer` | Linear label `data-engineer`; paths in `db-series/`, `etl/`, `dbt/` | Data pipeline code; time-series migrations; backfill scripts |
 | `contract-design` | PRD flagged `needs-contract` from Strategist; CCP requiring contract redesign | Proposed API contract (OpenAPI / GraphQL SDL / shared types); not code |
 | `pr-feedback` | CI failure, review comment, change request, human push to your branch | Commit + push + thread comment responding to the event |
 

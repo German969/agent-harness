@@ -8,7 +8,7 @@ description: Generate a paste-ready Claude Design prompt when UI work is needed 
 ## Activate when
 
 - The `pm` skill detects UI work in a PRD it's drafting (auto-invokes this skill)
-- Linear ticket labeled `needs-design`
+- Linear ticket labeled `design-prefill` (`needs-design` routes to Builder-Client, whose `claude-design-prefill` skill it starts)
 - Slack: `@strategist-agent prefill design for <feature>`
 
 ## What this skill exists to do

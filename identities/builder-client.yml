@@ -54,11 +54,11 @@ slack:
 routing:
   linear_labels:
     - frontend                                    # default frontend skill
-    - design                                      # claude-design-prefill / claude-design-handoff
+    - design                                      # frontend skill (work default)
     - mobile                                      # mobile skill
     - a11y                                        # a11y skill
     - screenshot                                  # screenshots skill (Protocol #4)
-    - needs-design                                # held until claude-design-prefill resolves
+    - needs-design                                # claude-design-prefill skill
     - client-bot                                  # explicit routing-by-label
   slack_default_channels: []
   github_auto_triggers: []

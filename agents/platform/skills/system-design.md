@@ -26,7 +26,7 @@ Every pattern you recommend must have a paragraph: "we gain X, we give up Y, wha
 
 - **First-time invocation in Phase 3** of the bootstrap (after Phase 0 founding docs land, before any code exists). SessionStart detects: founding docs present + no `<target-project>/docs/architecture/SYSTEM.md`.
 - Explicit human invocation: `@platform-agent design the system architecture` / `@platform-agent kick off architecture design`.
-- Linear ticket labeled `system-design`. *Today this routes to Platform but starts `architect`; `@platform-agent design` is what selects this skill (HAR-22).*
+- Linear ticket labeled `system-design`
 - Explicit re-invocation for a major redesign (rare; expensive): `@platform-agent redesign architecture`.
 
 **Do not activate** if founding docs are missing — refuse and recommend `@strategist-agent kick off Phase 0` first. Architecture without product context is unanchored.

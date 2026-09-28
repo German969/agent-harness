@@ -109,27 +109,89 @@ const STRATEGIST_INTENTS: ReadonlyArray<{ pattern: RegExp; skill: SkillId }> = [
  * file, since resolvableSkills reads this map.
  */
 const LABEL_SKILLS: Record<AgentId, Record<string, SkillId>> = {
+  // HAR-22: each routing label starts the skill its identity file names (the comment
+  // beside it in identities/<agent>.yml) and the skill's own trigger list claims.
+  // Before, only `prd` and `founding` did; the other six started `conversational`,
+  // the Haiku lookup-and-route skill. A label left out starts the work default.
   strategist: {
     prd: 'pm',
+    'scope-question': 'ba',
+    'support-feedback': 'triage',
+    research: 'researcher',
+    'status-question': 'pjm',
+    curate: 'curator',
+    'design-prefill': 'design-prefill',
     founding: 'founding',
   },
-  platform: {},
-  'builder-server': {},
-  'builder-client': {},
-  guardian: {},
+  // `arch` and `adr` start `architect`, the work default.
+  platform: {
+    'system-design': 'system-design',
+    release: 'release-manager',
+    finops: 'finops',
+    incident: 'incident-response',
+    devops: 'devops',
+    'cost-signoff': 'finops',
+  },
+  // `backend`, `api` and `migration` start `backend`, the work default. `api` marks
+  // implementation work on an API surface; the contract is `needs-contract`.
+  'builder-server': {
+    'needs-contract': 'contract-design',
+    ai: 'ai-specialist',
+    'data-engineer': 'data-engineer',
+  },
+  // `frontend` and `design` start `frontend`, the work default.
+  'builder-client': {
+    mobile: 'mobile',
+    a11y: 'a11y',
+    screenshot: 'screenshots',
+    'needs-design': 'claude-design-prefill',
+  },
+  // `qa` starts `qa`, the work default.
+  guardian: {
+    security: 'security',
+    'threat-model': 'security',
+    perf: 'performance',
+    compliance: 'compliance',
+    'legal-review': 'compliance',
+    'llm-security': 'llm-security',
+  },
   marketer: {
     campaign: 'campaign-lead',
     content: 'content-writer',
+    social: 'social-community',
+    email: 'email-lifecycle',
+    pr: 'pr-brand-steward',
+    brand: 'pr-brand-steward',
+    growth: 'growth-analyst',
+    'competitive-intel': 'benchmarking',
+    'marketing-asset': 'creative-brief',
     // A modifier: routes nowhere on its own, selects benchmarking alongside a
     // Marketer routing label.
     benchmark: 'benchmarking',
   },
+  // `harness` and `meta` start `agent-modifier`, the work default.
   harness: {
     'agent-improvement': 'agent-modifier',
     'agent-misbehavior': 'misbehavior-debugger',
+    'gap-analysis': 'gap-analyzer',
     'new-agent': 'agent-architect',
     'new-skill': 'skill-author',
     'router-change': 'router-engineer',
+  },
+};
+
+/**
+ * Skills with a file that the router deliberately never selects, and why (HAR-22).
+ * validate:fleet check 10 fails any skills/*.md that is neither resolvable nor
+ * listed here, so a skill the router can never pick is a decision, not an accident.
+ * Before this check, eleven files across five agents had no selector, label, intent
+ * or default reaching them (growth-analyst ran only from a schedule), and nothing
+ * noticed.
+ */
+export const NOT_ROUTER_SELECTED: Readonly<Partial<Record<AgentId, Record<SkillId, string>>>> = {
+  'builder-client': {
+    'claude-design-handoff':
+      'its trigger is a Claude Design handoff bundle attached to the ticket, and the router does not parse Linear attachments',
   },
 };
 
@@ -142,14 +204,13 @@ const LABEL_SKILLS: Record<AgentId, Record<string, SkillId>> = {
  * CLAUDE.md fans out from here (e.g. Guardian qa → qa+security on PR-open).
  */
 const WORK_DEFAULT_SKILLS: Record<AgentId, SkillId> = {
-  // Strategist has no work auto-trigger and its work tickets carry LABEL_SKILLS
-  // labels (prd→pm, …) that resolve before this fallback; an unlabeled assignment
-  // lands on conversational, which routes/escalates — matches prior behavior.
+  // Strategist has no work auto-trigger and every one of its routing labels is in
+  // LABEL_SKILLS (HAR-22), so only an unlabeled assignment lands here: on
+  // conversational, which routes/escalates.
   strategist: 'conversational',
-  // Platform's Linear routing labels (adr/release/finops/…) aren't in LABEL_SKILLS,
-  // so label-routed work tickets fall through to here — architect is the right work
-  // default (its CLAUDE.md then picks the specific skill). A bare mention is NOT a
-  // work trigger and goes to conversational (below), so a "hello" stays cheap.
+  // Platform's `arch`/`adr` labels and an unlabeled assignment land here. A bare
+  // mention is NOT a work trigger and goes to conversational (below), so a "hello"
+  // stays cheap.
   platform: 'architect',
   'builder-server': 'backend',
   'builder-client': 'frontend',

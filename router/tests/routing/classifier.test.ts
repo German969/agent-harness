@@ -532,9 +532,9 @@ describe('classify — Linear label routing', () => {
   // HAR-23: the ticket routes on its first ROUTING label, and the skill must come
   // from that agent's labels. A flat LABEL_SKILLS let `campaign` pick Guardian's skill.
   it.each([
-    [['security', 'campaign'], 'guardian', 'qa'],
+    [['security', 'campaign'], 'guardian', 'security'],
     [['campaign', 'security'], 'marketer', 'campaign-lead'],
-    [['perf', 'prd'], 'guardian', 'qa'],
+    [['perf', 'prd'], 'guardian', 'performance'],
     [['prd', 'perf'], 'strategist', 'pm'],
   ] as const)('labels %j → %s running %s', (labels, agent, skill) => {
     const result = classify(

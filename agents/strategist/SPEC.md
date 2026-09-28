@@ -44,7 +44,7 @@ Strategist is **multi-modal** — different triggers produce different shapes of
 
 The bulk of Strategist's work. Triggered by:
 - Human request in Slack (`@strategist-agent draft a PRD…`, `@strategist-agent research…`, `@strategist-agent triage this`).
-- Linear ticket assignment with a routing label (`prd`, `scope-question`, `research`, `support-feedback`). Only `prd` and `founding` select a skill; the others start `conversational` today (HAR-22; PROTOCOLS.md §5).
+- Linear ticket assignment with a routing label (`prd`, `scope-question`, `research`, `support-feedback`, …). Each starts the skill it names (PROTOCOLS.md §5).
 - Linear "Triage" queue items (unassigned tickets) — auto-routed.
 - Another agent bouncing a request back (e.g. `@server-agent` says "this ticket isn't clear enough to implement" → Strategist re-engages the requester).
 - Marketer asking for product depth during campaign discovery, or for testimonial routing.
@@ -132,7 +132,7 @@ The PM skill produces **per-feature PRDs** — one feature at a time, with detai
 
 **Triggers**
 - Slack: `@strategist-agent what's the ROI on X` / `analyze conversion for Y` / `quantify the impact of Z`
-- Linear: ticket with `scope-question` label *(intended; today it starts `conversational`, HAR-22)*
+- Linear: ticket with `scope-question` label
 
 **Procedure**
 1. **Frame the question precisely** — what decision is this analysis informing?
