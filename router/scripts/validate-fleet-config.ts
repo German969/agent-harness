@@ -38,8 +38,9 @@
 //      needs a token, so that half runs in the github-labels workflow instead.
 //   9. The Linear label tables in PROTOCOLS.md §5 are what the generator writes, and
 //      agents/linear-labels.yml agrees with the identities and LABEL_SKILLS: every
-//      routing label described, no label routed by two agents, every LABEL_SKILLS key
-//      either routing or a described modifier, descriptions within Linear's 255 cap.
+//      routing label described, no label routed by two agents, every LABEL_SKILLS[agent]
+//      key either one of that agent's routing labels or a described modifier (HAR-23),
+//      descriptions within Linear's 255 cap.
 //
 // Exits non-zero listing every problem found, rather than stopping at the first:
 // fixing config one CI run at a time is how a five-minute edit becomes an hour.

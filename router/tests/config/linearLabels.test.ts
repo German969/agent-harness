@@ -24,18 +24,20 @@ import {
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
+const labelSkills = (entries: Record<string, Record<string, string>>) =>
+  new Map(Object.entries(entries).map(([agent, m]) => [agent, new Map(Object.entries(m))]));
+
 function facts(overrides: Partial<RoutingFacts> = {}): RoutingFacts {
-  const skills: Record<string, string> = { prd: 'pm', benchmark: 'benchmarking' };
   return {
     declared: new Map([
       ['strategist', ['prd', 'research']],
       ['marketer', ['campaign']],
     ]),
-    labelSkill: (l) => skills[l],
-    labelSkillKeys: () => Object.keys(skills),
+    labelSkills: labelSkills({
+      strategist: { prd: 'pm' },
+      marketer: { benchmark: 'benchmarking' },
+    }),
     workDefaultSkill: (a) => (a === 'strategist' ? 'conversational' : 'campaign-lead'),
-    agentSkills: (a) =>
-      new Set(a === 'strategist' ? ['pm', 'conversational'] : ['campaign-lead', 'benchmarking']),
     ...overrides,
   };
 }
@@ -118,7 +120,7 @@ describe('crossCheckLinearLabels', () => {
 
   it('fails a LABEL_SKILLS key that routes nowhere and is not a described modifier', () => {
     expect(crossCheckLinearLabels(parsed(yaml(OK_ROUTING, '  {}')), facts()).join('\n')).toMatch(
-      /LABEL_SKILLS: 'benchmark' routes nowhere/,
+      /LABEL_SKILLS.marketer: 'benchmark' routes nowhere/,
     );
   });
 
@@ -128,7 +130,7 @@ describe('crossCheckLinearLabels', () => {
         parsed(yaml(OK_ROUTING, '  benchmark: "b"\n  nothing: "n"')),
         facts(),
       ).join('\n'),
-    ).toMatch(/modifier 'nothing' is not in LABEL_SKILLS/);
+    ).toMatch(/modifier 'nothing' is in no agent's LABEL_SKILLS/);
   });
 
   it('fails a modifier that routes on its own', () => {
@@ -140,12 +142,27 @@ describe('crossCheckLinearLabels', () => {
     ).toMatch(/'prd' routes \(to strategist\), so it belongs under routing/);
   });
 
-  it('fails a routing label whose selected skill its agent cannot run', () => {
+  it('fails a LABEL_SKILLS key that routes to a different agent (HAR-23)', () => {
+    // Guardian keyed on Marketer's `campaign`: it could only fire on a ticket some
+    // other label sent to Guardian, letting Marketer's label pick Guardian's skill.
     const f = facts({
-      labelSkill: (l) => ({ prd: 'pm', campaign: 'pm', benchmark: 'benchmarking' })[l],
+      labelSkills: labelSkills({
+        strategist: { prd: 'pm' },
+        marketer: { benchmark: 'benchmarking' },
+        guardian: { campaign: 'qa' },
+      }),
     });
+    expect(crossCheckLinearLabels(parsed(yaml(OK_ROUTING)), f)).toEqual([
+      expect.stringMatching(
+        /LABEL_SKILLS.guardian: 'campaign' \(→ 'qa'\) routes to marketer, not guardian/,
+      ),
+    ]);
+  });
+
+  it('fails a modifier no agent keys on, even when another agent does', () => {
+    const f = facts({ labelSkills: labelSkills({ strategist: { prd: 'pm' } }) });
     expect(crossCheckLinearLabels(parsed(yaml(OK_ROUTING)), f).join('\n')).toMatch(
-      /'campaign' selects 'pm', but the label routes to marketer/,
+      /modifier 'benchmark' is in no agent's LABEL_SKILLS/,
     );
   });
 
@@ -168,8 +185,19 @@ describe('renderLabelTables', () => {
     expect(out).toContain('| `campaign` | Marketer | `campaign-lead` (work default) | c |');
   });
 
-  it('lists modifiers with their skill, and conventions', () => {
-    expect(out).toContain('| `benchmark` | `benchmarking` | b |');
+  it('shows a routing label another agent keys on as the work default, not that skill', () => {
+    // The generator must show what the router does: LABEL_SKILLS.strategist.campaign
+    // cannot fire on a ticket routed to Marketer.
+    const f = facts({
+      labelSkills: labelSkills({ strategist: { prd: 'pm', campaign: 'pm' } }),
+    });
+    expect(renderLabelTables(parsed(yaml(OK_ROUTING)), f)).toContain(
+      '| `campaign` | Marketer | `campaign-lead` (work default) | c |',
+    );
+  });
+
+  it('lists modifiers with the agent and skill, and conventions', () => {
+    expect(out).toContain('| `benchmark` | Marketer | `benchmarking` | b |');
     expect(out).toContain('| `Bug` | c |');
   });
 

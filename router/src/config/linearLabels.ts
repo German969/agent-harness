@@ -3,7 +3,8 @@
 //
 // §5 used to call itself "the canonical label registry" while nothing read it. The
 // router's label → agent map comes only from `routing.linear_labels` in
-// identities/*.yml, and the label → skill map only from LABEL_SKILLS. §5 had
+// identities/*.yml, and the label → skill map only from LABEL_SKILLS (keyed by
+// agent since HAR-23). §5 had
 // drifted from both: seven labels under names that never routed, eleven routing
 // labels missing, and ones that exist nowhere. A second copy nothing checks
 // is a second copy that drifts.
@@ -36,11 +37,9 @@ export type LabelDescriptions = {
 export type RoutingFacts = {
   /** agent → its routing.linear_labels, in identity-file order. */
   declared: ReadonlyMap<string, readonly string[]>;
-  labelSkill: (label: string) => string | undefined;
-  labelSkillKeys: () => string[];
+  /** agent → (Linear label → skill): LABEL_SKILLS, which is keyed by agent. */
+  labelSkills: ReadonlyMap<string, ReadonlyMap<string, string>>;
   workDefaultSkill: (agent: string) => string;
-  /** Skills an agent can run (resolvableSkills plus its skills/ files). */
-  agentSkills: (agent: string) => ReadonlySet<string>;
 };
 
 const SECTIONS = ['routing', 'modifiers', 'conventions'] as const;
@@ -144,33 +143,38 @@ export function crossCheckLinearLabels(d: LabelDescriptions, facts: RoutingFacts
     }
   }
 
-  const skillKeys = new Set(facts.labelSkillKeys());
-  for (const label of d.modifiers.keys()) {
-    if (!skillKeys.has(label)) {
-      problems.push(
-        `${LABELS_PATH}: modifier '${label}' is not in LABEL_SKILLS, so it selects nothing`,
-      );
+  // LABEL_SKILLS is keyed by agent (HAR-23). An entry fires only on a ticket routed
+  // to that agent, so its key must be one of that agent's own routing labels or a
+  // modifier that routes nowhere. A key another agent routes on is dead at best,
+  // and a label another agent owns picking this agent's skill is the ambiguity the
+  // per-agent keying removed. Whether each skill has a file is check 5's job:
+  // resolvableSkills includes these values.
+  const modifierAgents = new Map<string, string[]>();
+  for (const [agent, skills] of facts.labelSkills) {
+    for (const [label, skill] of skills) {
+      const router = byLabel.get(label);
+      if (router === undefined) {
+        modifierAgents.set(label, [...(modifierAgents.get(label) ?? []), agent]);
+        if (!d.modifiers.has(label)) {
+          problems.push(
+            `LABEL_SKILLS.${agent}: '${label}' routes nowhere and ${LABELS_PATH} → modifiers does not describe it`,
+          );
+        }
+      } else if (router !== agent) {
+        problems.push(
+          `LABEL_SKILLS.${agent}: '${label}' (→ '${skill}') routes to ${router}, not ${agent}. A key must be one of ${agent}'s routing labels or a modifier`,
+        );
+      }
     }
+  }
+  for (const label of d.modifiers.keys()) {
     if (byLabel.has(label)) {
       problems.push(
         `${LABELS_PATH}: '${label}' routes (to ${byLabel.get(label)}), so it belongs under routing, not modifiers`,
       );
-    }
-  }
-  for (const label of skillKeys) {
-    if (!byLabel.has(label) && !d.modifiers.has(label)) {
+    } else if (!modifierAgents.has(label)) {
       problems.push(
-        `LABEL_SKILLS: '${label}' routes nowhere and ${LABELS_PATH} → modifiers does not describe it`,
-      );
-    }
-  }
-  // A routing label whose LABEL_SKILLS skill its own agent cannot run starts a
-  // session with no procedure.
-  for (const [label, agent] of byLabel) {
-    const skill = facts.labelSkill(label);
-    if (skill && !facts.agentSkills(agent).has(skill)) {
-      problems.push(
-        `LABEL_SKILLS: '${label}' selects '${skill}', but the label routes to ${agent}, which has no such skill`,
+        `${LABELS_PATH}: modifier '${label}' is in no agent's LABEL_SKILLS, so it selects nothing`,
       );
     }
   }
@@ -218,7 +222,7 @@ export function renderLabelTables(d: LabelDescriptions, facts: RoutingFacts): st
   for (const [agent, labels] of facts.declared) {
     for (const label of labels) {
       if (byLabel.get(label) !== agent) continue; // a collision; reported by the check
-      const selected = facts.labelSkill(label);
+      const selected = facts.labelSkills.get(agent)?.get(label);
       const skill = selected
         ? `\`${selected}\``
         : `\`${facts.workDefaultSkill(agent)}\` (work default)`;
@@ -229,9 +233,18 @@ export function renderLabelTables(d: LabelDescriptions, facts: RoutingFacts): st
   }
 
   lines.push('', '#### Modifier labels — pick the skill, route nowhere on their own', '');
-  lines.push('| Label | Selects skill | What it is for |', '|---|---|---|');
+  lines.push(
+    '| Label | On a ticket routed to | Selects skill | What it is for |',
+    '|---|---|---|---|',
+  );
   for (const [label, description] of [...d.modifiers].sort(([a], [b]) => a.localeCompare(b))) {
-    lines.push(`| \`${label}\` | \`${facts.labelSkill(label) ?? '—'}\` | ${cell(description)} |`);
+    const users = [...facts.labelSkills].filter(([, skills]) => skills.has(label));
+    if (users.length === 0) lines.push(`| \`${label}\` | — | — | ${cell(description)} |`);
+    for (const [agent, skills] of users) {
+      lines.push(
+        `| \`${label}\` | ${agentName(agent)} | \`${skills.get(label)}\` | ${cell(description)} |`,
+      );
+    }
   }
 
   lines.push('', '#### Convention labels — route nothing; applied per the layers below', '');

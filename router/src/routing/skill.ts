@@ -92,18 +92,45 @@ const STRATEGIST_INTENTS: ReadonlyArray<{ pattern: RegExp; skill: SkillId }> = [
   { pattern: MEMO_INTENT, skill: 'memo' },
 ];
 
-/** Linear label → skill (checked when the ticket carries the label). */
-const LABEL_SKILLS: Record<string, SkillId> = {
-  prd: 'pm',
-  founding: 'founding',
-  campaign: 'campaign-lead',
-  content: 'content-writer',
-  benchmark: 'benchmarking',
-  'agent-improvement': 'agent-modifier',
-  'agent-misbehavior': 'misbehavior-debugger',
-  'new-agent': 'agent-architect',
-  'new-skill': 'skill-author',
-  'router-change': 'router-engineer',
+/**
+ * Linear label → skill, per agent (HAR-23). A label selects a skill only for the
+ * agent the ticket was routed to, the same shape as AGENT_SKILL_SELECTORS.
+ *
+ * This map used to be flat: the first label on the ticket that appeared anywhere in
+ * it picked the skill, whichever agent was handling the ticket. The router routes a
+ * ticket on its first ROUTING label, so a ticket labeled `security` + `campaign`
+ * went to Guardian and then started `campaign-lead`, a skill Guardian does not have;
+ * one assigned to Builder-Server that also carried `prd` started `pm`. Which skill
+ * ran depended on label order, and could be a skill with no file to deliver.
+ *
+ * Keyed by agent, a label another agent owns is simply not looked at. validate:fleet
+ * check 9 fails a key that routes to a different agent (it would let that agent's
+ * label pick this agent's skill again), and check 5 fails a value with no skill
+ * file, since resolvableSkills reads this map.
+ */
+const LABEL_SKILLS: Record<AgentId, Record<string, SkillId>> = {
+  strategist: {
+    prd: 'pm',
+    founding: 'founding',
+  },
+  platform: {},
+  'builder-server': {},
+  'builder-client': {},
+  guardian: {},
+  marketer: {
+    campaign: 'campaign-lead',
+    content: 'content-writer',
+    // A modifier: routes nowhere on its own, selects benchmarking alongside a
+    // Marketer routing label.
+    benchmark: 'benchmarking',
+  },
+  harness: {
+    'agent-improvement': 'agent-modifier',
+    'agent-misbehavior': 'misbehavior-debugger',
+    'new-agent': 'agent-architect',
+    'new-skill': 'skill-author',
+    'router-change': 'router-engineer',
+  },
 };
 
 /**
@@ -177,10 +204,10 @@ export function resolveSkill(
   const selector = extractSelector(agent, event);
   if (selector) return selector;
 
-  // 2. Label-based (Linear only)
+  // 2. Label-based (Linear only), from this agent's labels only — see LABEL_SKILLS.
   if (event.provider === 'linear') {
-    const label = extractFirstMatchingLabel(event);
-    if (label && LABEL_SKILLS[label]) return LABEL_SKILLS[label] as SkillId;
+    const skill = labelSkillFor(agent, event);
+    if (skill) return skill;
   }
 
   // 2b. Strategist phrase intents (matched anywhere in the text), in table order —
@@ -261,19 +288,38 @@ function extractText(event: WebhookEvent): string | undefined {
   return undefined;
 }
 
-function extractFirstMatchingLabel(event: WebhookEvent): string | undefined {
+/** The skill the ticket's first label in LABEL_SKILLS[agent] selects, if any. */
+function labelSkillFor(agent: AgentId, event: WebhookEvent): SkillId | undefined {
+  const skills = LABEL_SKILLS[agent];
+  if (!skills) return undefined;
   const p = event.payload as { data?: unknown };
   if (typeof p.data !== 'object' || p.data === null) return undefined;
   const d = p.data as { labels?: unknown };
   if (!Array.isArray(d.labels)) return undefined;
   for (const label of d.labels) {
-    if (typeof label === 'string' && LABEL_SKILLS[label]) return label;
-    if (typeof label === 'object' && label !== null && 'name' in label) {
-      const name = (label as { name: unknown }).name;
-      if (typeof name === 'string' && LABEL_SKILLS[name]) return name;
-    }
+    const name =
+      typeof label === 'string'
+        ? label
+        : typeof label === 'object' && label !== null && 'name' in label
+          ? (label as { name: unknown }).name
+          : undefined;
+    // hasOwn, not a plain index: a label named `constructor` used to return
+    // Object.prototype.constructor, a function, as the skill.
+    if (typeof name === 'string' && Object.hasOwn(skills, name)) return skills[name];
   }
   return undefined;
+}
+
+/** Linear label → skill for one agent: LABEL_SKILLS[agent]. Read by the §5 label
+ *  table generator and check 9 (config/linearLabels.ts), so the table shows what the
+ *  router actually selects rather than what a comment claims. */
+export function labelSkills(agent: AgentId): Readonly<Record<string, SkillId>> {
+  return { ...(LABEL_SKILLS[agent] ?? {}) };
+}
+
+/** The skill a label-routed ticket starts when none of its labels is in LABEL_SKILLS[agent]. */
+export function workDefaultSkill(agent: AgentId): SkillId {
+  return WORK_DEFAULT_SKILLS[agent];
 }
 
 /**
@@ -282,35 +328,16 @@ function extractFirstMatchingLabel(event: WebhookEvent): string | undefined {
  * delivers no procedure at all, which is the gap this whole change closes; a
  * mapping that can silently point at nothing would reopen it one level up.
  *
- * Derived from the same maps the resolver reads, so it cannot drift.
- *
- * LABEL_SKILLS is deliberately excluded. It maps a Linear LABEL to a skill with
- * no reference to an agent, so every agent nominally "can" reach `pm` or
- * `campaign-lead`; which agent-label pairs actually occur is a routing question,
- * not a skill-resolution one, and asserting it here would invent failures.
+ * Derived from the same maps the resolver reads, so it cannot drift. LABEL_SKILLS
+ * is included now that it is keyed by agent (HAR-23): each entry is a skill that
+ * agent can actually be handed.
  */
-/** The skill a Linear label selects, if it is in LABEL_SKILLS. Read by the §5 label
- *  table generator (config/linearLabels.ts), so the table shows what the router
- *  actually selects rather than what a comment claims. */
-export function labelSkill(label: string): SkillId | undefined {
-  return LABEL_SKILLS[label];
-}
-
-/** Every label LABEL_SKILLS knows. */
-export function labelSkillKeys(): string[] {
-  return Object.keys(LABEL_SKILLS);
-}
-
-/** The skill a label-routed ticket starts when its label is not in LABEL_SKILLS. */
-export function workDefaultSkill(agent: AgentId): SkillId {
-  return WORK_DEFAULT_SKILLS[agent];
-}
-
 export function resolvableSkills(agent: AgentId): SkillId[] {
   const prFeedback = PR_FEEDBACK_SKILLS[agent];
   return [
     ...new Set<SkillId>([
       ...Object.values(AGENT_SKILL_SELECTORS[agent] ?? {}),
+      ...Object.values(LABEL_SKILLS[agent] ?? {}),
       ...(prFeedback ? [prFeedback] : []),
       ...(agent === 'strategist' ? STRATEGIST_INTENTS.map((i) => i.skill) : []),
       WORK_DEFAULT_SKILLS[agent],

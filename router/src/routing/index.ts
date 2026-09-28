@@ -14,7 +14,7 @@ export {
 } from './schema.js';
 export { buildThreadKey } from './threadKey.js';
 export { extractMentionedAgent } from './mention.js';
-export { labelSkill, labelSkillKeys, resolveSkill, workDefaultSkill } from './skill.js';
+export { labelSkills, resolveSkill, workDefaultSkill } from './skill.js';
 export {
   classify,
   isWorkTrigger,

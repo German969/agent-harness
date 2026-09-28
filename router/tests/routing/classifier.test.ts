@@ -529,6 +529,49 @@ describe('classify — Linear label routing', () => {
     });
   });
 
+  // HAR-23: the ticket routes on its first ROUTING label, and the skill must come
+  // from that agent's labels. A flat LABEL_SKILLS let `campaign` pick Guardian's skill.
+  it.each([
+    [['security', 'campaign'], 'guardian', 'qa'],
+    [['campaign', 'security'], 'marketer', 'campaign-lead'],
+    [['perf', 'prd'], 'guardian', 'qa'],
+    [['prd', 'perf'], 'strategist', 'pm'],
+  ] as const)('labels %j → %s running %s', (labels, agent, skill) => {
+    const result = classify(
+      ev({
+        provider: 'linear',
+        event_type: 'Issue.update',
+        agent_hint: 'wh-unknown',
+        payload: { data: { identifier: 'ENG-4', labels: labels.map((name) => ({ name })) } },
+      }),
+      { registry, db },
+    );
+    expect(result).toMatchObject({ route: 'agent', agent, skill, match_reason: 'linear_label' });
+  });
+
+  it('a ticket assigned to an agent ignores another agent’s skill labels', () => {
+    const result = classify(
+      ev({
+        provider: 'linear',
+        event_type: 'Issue.update',
+        agent_hint: 'wh-unknown',
+        payload: {
+          data: {
+            identifier: 'ENG-5',
+            assignee: { id: 'usr-guard' },
+            labels: [{ name: 'prd' }, { name: 'campaign' }],
+          },
+        },
+      }),
+      { registry, db },
+    );
+    expect(result).toMatchObject({
+      agent: 'guardian',
+      skill: 'qa',
+      match_reason: 'linear_assignment',
+    });
+  });
+
   it('mention wins over label', () => {
     const result = classify(
       ev({

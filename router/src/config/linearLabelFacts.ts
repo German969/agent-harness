@@ -1,15 +1,9 @@
 // Reads the real repo into the `RoutingFacts` linearLabels.ts needs. Kept apart from
 // linearLabels.ts so that module stays pure and testable with fakes.
 
-import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadIdentities } from '../routing/loader.js';
-import {
-  labelSkill,
-  labelSkillKeys,
-  resolvableSkills,
-  workDefaultSkill,
-} from '../routing/skill.js';
+import { labelSkills, workDefaultSkill } from '../routing/skill.js';
 import type { AgentId } from '../types.js';
 import { AGENT_ORDER, type RoutingFacts } from './linearLabels.js';
 
@@ -25,22 +19,17 @@ export function loadRoutingFacts(repoRoot: string): { facts: RoutingFacts; error
   const declared = new Map<string, readonly string[]>(
     sorted.map((id) => [id.agent, id.routing?.linear_labels ?? []]),
   );
-  const agentSkills = (agent: string): ReadonlySet<string> => {
-    const dir = join(repoRoot, 'agents', agent, 'skills');
-    const files = existsSync(dir)
-      ? readdirSync(dir)
-          .filter((f) => f.endsWith('.md'))
-          .map((f) => f.slice(0, -3))
-      : [];
-    return new Set([...resolvableSkills(agent as AgentId), ...files]);
-  };
+  // Every agent in the fleet order, plus any identity outside it, so LABEL_SKILLS
+  // entries for an agent are checked even if its identity file failed to load.
+  const agents = [...new Set<string>([...AGENT_ORDER, ...sorted.map((id) => id.agent)])];
+  const skillMaps = new Map<string, ReadonlyMap<string, string>>(
+    agents.map((agent) => [agent, new Map(Object.entries(labelSkills(agent as AgentId)))]),
+  );
   return {
     facts: {
       declared,
-      labelSkill,
-      labelSkillKeys,
+      labelSkills: skillMaps,
       workDefaultSkill: (agent) => workDefaultSkill(agent as AgentId),
-      agentSkills,
     },
     errors: errors.map((e) => `identities/${e.file}: ${e.reason}`),
   };

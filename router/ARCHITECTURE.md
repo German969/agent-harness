@@ -339,7 +339,7 @@ The router loads all seven identities **once at startup** and builds the routing
 
 Order of resolution:
 1. Explicit selector in message body: `@guardian-bot llm-redteam X` → skill=`llm-security` (matches the `@<agent> <action> ...` pattern)
-2. Label-based: `agents/<name>/settings.json` maps Linear labels to skills
+2. Label-based: `LABEL_SKILLS` in `routing/skill.ts` maps Linear labels to skills **per agent**. Only the routed agent's own labels are read, so a ticket labeled `security` + `campaign` that routed to Guardian does not start Marketer's `campaign-lead` (HAR-23)
 3. Trigger-type default: PR-opened on Guardian → multiple skills (qa, security, design-system if UI files touched, llm-security if AI paths touched) per the three-tier path scan
 4. Fallback: the agent's primary skill (`backend` for Builder-Server, `frontend` for Builder-Client, `pm` for Strategist, etc.)
 

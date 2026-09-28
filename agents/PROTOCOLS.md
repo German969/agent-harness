@@ -601,10 +601,10 @@ Labels are team-scoped in Linear (each workspace has its own set). The tables be
 **Where each fact lives.** Nothing reads this section; the router reads code. So these tables are **generated from the code**, and `validate:fleet` (check 9) fails if they fall out of date:
 
 - **Which labels route, and to which agent:** `routing.linear_labels` in `identities/*.yml`, the only thing the router reads (`routing/registry.ts`). Names match **exactly**, case included.
-- **Which skill a routed ticket starts:** `LABEL_SKILLS` in `routing/skill.ts`. A routing label not in it starts the agent's **work default**, and that agent's CLAUDE.md then picks the specific procedure.
+- **Which skill a routed ticket starts:** `LABEL_SKILLS` in `routing/skill.ts`, keyed by agent. Only the routed agent's own entries are read, so another agent's label on the same ticket never picks the skill (HAR-23). When none of the ticket's labels is in the agent's entries, it starts the agent's **work default**, and that agent's CLAUDE.md then picks the specific procedure.
 - **What each label is for:** `agents/linear-labels.yml`. It holds descriptions only; it adds no routing.
 
-To change a label, edit the identity file (routing), `LABEL_SKILLS` (skill) or `agents/linear-labels.yml` (description), then run `pnpm labels:protocols` from `router/` and commit the regenerated tables. Check 9 also fails when an identity and the descriptions file disagree, or when two agents declare the same routing label.
+To change a label, edit the identity file (routing), `LABEL_SKILLS` (skill) or `agents/linear-labels.yml` (description), then run `pnpm labels:protocols` from `router/` and commit the regenerated tables. Check 9 also fails when an identity and the descriptions file disagree, when two agents declare the same routing label, or when an agent's `LABEL_SKILLS` entry is keyed on a label that routes to a different agent.
 
 This replaced a hand-written "canonical registry" that had drifted from both sources: seven labels under names that never routed (`analysis`, `triage`, `phase-0`, `architecture`, `architecture-design`, `infra`, `data`/`pipeline`), eleven routing labels missing, and type labels in the wrong case (HAR-19).
 
@@ -676,9 +676,9 @@ This replaced a hand-written "canonical registry" that had drifted from both sou
 
 #### Modifier labels — pick the skill, route nowhere on their own
 
-| Label | Selects skill | What it is for |
-|---|---|---|
-| `benchmark` | `benchmarking` | Alongside a Marketer routing label, selects the benchmarking skill. Routes nowhere on its own. |
+| Label | On a ticket routed to | Selects skill | What it is for |
+|---|---|---|---|
+| `benchmark` | Marketer | `benchmarking` | Alongside a Marketer routing label, selects the benchmarking skill. Routes nowhere on its own. |
 
 #### Convention labels — route nothing; applied per the layers below
 

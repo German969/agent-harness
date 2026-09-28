@@ -2,7 +2,8 @@
 #
 # WHICH labels route, and to whom, is decided by `routing.linear_labels` in
 # identities/*.yml, the only thing the router reads (routing/registry.ts). WHICH
-# skill a routed ticket starts is decided by LABEL_SKILLS in routing/skill.ts. This
+# skill a routed ticket starts is decided by LABEL_SKILLS in routing/skill.ts, keyed
+# by agent: only the routed agent's own entries are read (HAR-23). This
 # file adds only what neither carries: a description saying what the label is for
 # and who applies it. It must not restate routing or skills. Those appear in the
 # generated table in agents/PROTOCOLS.md §5, derived from the code.
@@ -10,7 +11,8 @@
 # validate:fleet check 9 fails when:
 #   - a routing label in an identity file is missing here, or one listed here is
 #     declared by no identity;
-#   - a modifier is not a LABEL_SKILLS key, or it routes on its own;
+#   - a modifier is in no agent's LABEL_SKILLS, or it routes on its own;
+#   - an agent's LABEL_SKILLS entry is keyed on a label that routes to another agent;
 #   - a convention label is also a routing label;
 #   - two identities declare the same routing label (the router takes whichever file
 #     loads first, and readdir order is not something to route on);
@@ -90,8 +92,8 @@ routing:
   router-change: "Change the router's TypeScript source. Distinct from the GitHub PR label of the same name, which the router applies to router-opened PRs."
   harness-bot: "Explicit routing to Harness when no other Harness label fits. Not the GitHub PR-owner label `agent:harness-bot`."
 
-# Labels in LABEL_SKILLS that route nowhere on their own. They pick the skill when
-# the ticket also carries a label that routes it to the agent owning that skill.
+# Labels in an agent's LABEL_SKILLS that route nowhere on their own. They pick the
+# skill when the ticket also carries a label that routes it to that agent.
 modifiers:
   benchmark: "Alongside a Marketer routing label, selects the benchmarking skill. Routes nowhere on its own."
 
