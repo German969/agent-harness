@@ -1228,6 +1228,31 @@ Agent: <persona>
   `agent:<bot>` attribution label is for **router-run** sessions, where routing that PR's
   events to its owner is exactly the point; the labels the router's own hooks apply stay
   as they are.
+- **Commit author: the fleet owner, outside the router.** A session the router did not
+  start authors its commits as the fleet owner, using the name and email on the owner's
+  own commits. The agent stays visible through the `Co-Authored-By` trailer, the `Agent:`
+  trailer and the signature above, so ownership is not lost. The reason: Vercel's Hobby
+  plan deploys only commits the team owner authored. A placeholder identity (`t <t@t>`)
+  got chatbots#34's first preview `BLOCKED` (HAR-26). The claude.ai environment sets this
+  identity, through the `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` environment variables and
+  the setup script. Prefer the variables: the session's own `~/.gitconfig` was seen being
+  rewritten mid-session, so a `git config --global` from the setup script alone can
+  be lost. Whatever the environment says, check the author of every unpushed commit
+  before pushing, with `git log <upstream>..HEAD --format='%h %an <%ae>'`. Here
+  `<upstream>` is the branch's remote copy. For a branch never pushed, it is the remote
+  branch the work was cut from, the PR's base (`origin/main`, or `origin/staging` in a
+  project whose PRs target `staging`), never a hard-coded `origin/main`. If any author isn't the owner, fix the source first. When
+  `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` are set, they override `git config`, so correct
+  or unset them in the shell that commits. Otherwise set `git config user.name` and
+  `git config user.email` in the repository. Then rewrite the unpushed commits with the
+  author reset, because a plain `git commit --amend` keeps the old author: use
+  `git commit --amend --no-edit --reset-author` for the last one, or
+  `git rebase --exec 'git commit --amend --no-edit --reset-author' <upstream>` for
+  several. **Router sessions are out of scope:** the router sets its own commit
+  identity in code (`router/src/runtime/gitEnv.ts`,
+  `<agent>-agent <agent@dev-team.local>`), so their commits to `chatbots` still get no
+  Vercel preview on Hobby. Closing that gap takes Vercel Pro or a router change, and the
+  call is Harness's.
 - **Editing someone else's PR does not change its owner.** Add commits; leave the
   signature alone. If ownership really moves, say so in a PR comment and change the
   signature in the same edit.
