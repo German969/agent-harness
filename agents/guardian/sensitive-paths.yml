@@ -48,6 +48,9 @@ families:
   - ai-prompts
   - webhooks
   - audit
+  # Project extension (PROTOCOLS.md §2): not in the protocol's table. The reasoning is
+  # dev-team-state/projects/iris/guardian/sensitive-pattern-families.md, Extension 4.
+  - agent-authority
 
 # Inert prose. Matched against the WHOLE changed-file set: if every changed path
 # matches one of these, the tier is skip.
@@ -68,6 +71,8 @@ families:
 #                        prose — code with a person as the interpreter.
 #   .claude/**           agent instructions stored as markdown. Changing one changes what
 #                        an agent does; the extension is incidental.
+#                        Except .claude/settings*.json, which is deep since 2026-10-02 —
+#                        see the agent-authority entries under `patterns` (IRS-81).
 #
 # WHAT PROMPTED IT: chatbots PR #26 (2026-09-16) changed founding/STACK.md, an ADR and a
 # runbook. Guardian classified it skip and posted nothing. Copilot reviewed the same diff
@@ -212,3 +217,15 @@ patterns:
     family: infra
     added: 2026-10-02
     reason: "The ledger the target's `sensitive-path-candidates` guard reads before it asks for a proposal: any glob listed here, `proposed` or `not-sensitive`, mutes the guard for that path. A careless or wrong entry silences the check that feeds this registry, which is the same 'a change here can mute a check' reasoning as tools/guardrails/src/**. Raised as a minor finding by Guardian's review of chatbots#50."
+
+  # --- agent-authority: an Iris project extension (IRS-81) ---
+  # Config the agent harness reads, not the model: it grants an agent session permission
+  # to act without asking. The rest of .claude/** is instructions and stays light.
+  - glob: "**/.claude/settings*.json"
+    family: agent-authority
+    added: 2026-10-02
+    reason: "Pre-approves tool calls for every agent session started in that directory, with no prompt. chatbots' copy allows 17 Linear write tools today. The same file can also define hooks, which run shell commands on session events. One added array element silently widens what an agent may do, and nothing visible changes at runtime: the next session just stops asking. That is the change a light read is least likely to question. `settings*` also catches settings.local.json if it is ever committed (it is gitignored today), and `**/` catches a nested copy, which applies to sessions started in that subdirectory. IRS-81 (Strategist curator sweep 2026-09-04, candidate 5)."
+  - glob: "**/.mcp.json"
+    family: agent-authority
+    added: 2026-10-02
+    reason: "Forward-looking: none exists in the target yet. It declares the MCP servers a project session connects to, including the command each one runs, so adding a server adds both an executable and a set of tools an agent can call. The same silent widening as .claude/settings*.json, which is why IRS-81 asked whether to include it. IRS-81."
