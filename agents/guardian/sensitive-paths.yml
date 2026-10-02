@@ -106,10 +106,10 @@ patterns:
     family: auth
     added: 2026-09-03
     reason: "Family pattern. No auth module exists in iris yet; this is here so the first one is deep-scanned on the PR that introduces it, not on the PR after somebody notices."
-  - glob: "**/{authentication,authorization,permissions,sessions,rbac}/**"
+  - glob: "**/{authentication,authorization,permissions,session,sessions,rbac}/**"
     family: auth
     added: 2026-09-03
-    reason: "Family pattern, the named-directory half of the auth family in PROTOCOLS.md §2."
+    reason: "Family pattern, the named-directory half of the auth family in PROTOCOLS.md §2. `session` (singular) added 2026-10-02: chatbots#45 landed apps/iris-api/src/session/, whose controller serves GET /session (the caller's user, tenant id and tenant name from the guard-resolved context), and the plural-only list missed it."
   - glob: "**/{payment,payments,billing,subscription,subscriptions,invoice,invoices}/**"
     family: payments
     added: 2026-09-03
@@ -204,3 +204,7 @@ patterns:
     family: infra
     added: 2026-10-02
     reason: "The API's CORS policy (IRS-43): which origins may call it with a bearer token. IRS-63 proposal 4 expected this to land in main.ts; it landed here, and main.ts only calls it (removing that call fails closed for browsers, so main.ts is not added)."
+  - glob: "apps/iris-api/src/queue/{migrate,boss.provider}.ts"
+    family: migrations
+    added: 2026-10-02
+    reason: "pg-boss's schema DDL. boss.provider.ts holds both halves: installQueueSchema runs it (migrate: true), and startPgBoss's `migrate: false` is the one setting that stops every API and worker boot from changing the production schema unreviewed, outside ADR-0010's gate. migrate.ts is the `pnpm queue:migrate` entry point that calls it. The pgboss schema lives in the app's own Postgres, so this is a migration in everything but path name; the `migrations` family glob does not reach it."
