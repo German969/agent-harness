@@ -180,3 +180,27 @@ patterns:
     family: user-data
     added: 2026-10-01
     reason: "Tenant isolation, runtime half. Introduced by chatbots#45 (IRS-43): tenant-provisioning.ts is ADR-0016's documented bypass, reading and writing `tenants` (the root of the isolation hierarchy) outside the tenant-scoped repositories, and tenant-context.ts is the request-scoped context IRS-44's repositories filter on. Same rationale as packages/db/src/schema/**: a change here can silently make cross-tenant reads possible. Proposed by Builder-Server on chatbots#45."
+
+  # --- IRS-63, 2026-10-02: the curator backstop's four proposals of 2026-09-04,
+  # re-checked against chatbots main at 8321965 and dispositioned. Rejections and
+  # their reasons are on the ticket, not here.
+  - glob: "packages/db/src/**"
+    family: user-data
+    added: 2026-10-02
+    reason: "The rest of the database package beyond schema/** (which keeps its own entry): client.ts, the tables.ts barrel, index.ts, and wherever IRS-44's tenant-scoped repository layer lands if it lands in this package. That layer is the sole production enforcement of tenant isolation (ADR-0016: no RLS in prod), so the schema it protects being deep while the enforcement is light was backwards. IRS-63 proposal 1, widened to the directory so a new file here is covered on the PR that adds it."
+  - glob: "packages/db/drizzle.config.ts"
+    family: migrations
+    added: 2026-10-02
+    reason: "Decides what drizzle-kit generates: its `schema: './src/schema/*.ts'` glob is how a new table reaches a migration. Narrowing it drops tables from migrations and still passes the CI migrations gate, as the file's own comment warns. packages/db/drizzle/** (the output) was deep; the config that produces it was not. IRS-63 proposal 3."
+  - glob: "tools/guardrails/src/**"
+    family: infra
+    added: 2026-10-02
+    reason: "The code the CI `guardrails` job runs, including findSensitiveCandidates in guards.ts — the producer side of PROTOCOLS §2. A change here can mute a check, and IRS-60 (nothing protects the checks from being weakened) is still open. test/ is deliberately excluded. Also matches audit-liveness*.ts, which the target's .github/sensitive-path-candidates.json marks not-sensitive: that file decides whether to prompt a proposal, this one decides scan depth, and a deeper scan of two small files is cheap. IRS-63 proposal 2."
+  - glob: "apps/iris-api/src/app.module.ts"
+    family: auth
+    added: 2026-10-02
+    reason: "Composes AuthModule, which registers AuthGuard as the global APP_GUARD (IRS-43, chatbots#45). Dropping that import makes every route public with no change under auth/ — so **/auth*/** alone does not cover it. IRS-63 proposal 4 called this file a future seam; it is now load-bearing."
+  - glob: "apps/iris-api/src/http.ts"
+    family: infra
+    added: 2026-10-02
+    reason: "The API's CORS policy (IRS-43): which origins may call it with a bearer token. IRS-63 proposal 4 expected this to land in main.ts; it landed here, and main.ts only calls it (removing that call fails closed for browsers, so main.ts is not added)."
