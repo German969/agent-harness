@@ -176,3 +176,7 @@ patterns:
     family: webhooks
     added: 2026-09-03
     reason: "Next.js route handlers — the public HTTP surface of the web app, including anything WhatsApp calls back into."
+  - glob: "apps/iris-api/src/tenancy/**"
+    family: user-data
+    added: 2026-10-01
+    reason: "Tenant isolation, runtime half. Introduced by chatbots#45 (IRS-43): tenant-provisioning.ts is ADR-0016's documented bypass, reading and writing `tenants` (the root of the isolation hierarchy) outside the tenant-scoped repositories, and tenant-context.ts is the request-scoped context IRS-44's repositories filter on. Same rationale as packages/db/src/schema/**: a change here can silently make cross-tenant reads possible. Proposed by Builder-Server on chatbots#45."
