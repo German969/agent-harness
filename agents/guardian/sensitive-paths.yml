@@ -208,3 +208,7 @@ patterns:
     family: migrations
     added: 2026-10-02
     reason: "pg-boss's schema DDL. boss.provider.ts holds both halves: installQueueSchema runs it (migrate: true), and startPgBoss's `migrate: false` is the one setting that stops every API and worker boot from changing the production schema unreviewed, outside ADR-0010's gate. migrate.ts is the `pnpm queue:migrate` entry point that calls it. The pgboss schema lives in the app's own Postgres, so this is a migration in everything but path name; the `migrations` family glob does not reach it."
+  - glob: ".github/sensitive-path-candidates.json"
+    family: infra
+    added: 2026-10-02
+    reason: "The ledger the target's `sensitive-path-candidates` guard reads before it asks for a proposal: any glob listed here, `proposed` or `not-sensitive`, mutes the guard for that path. A careless or wrong entry silences the check that feeds this registry, which is the same 'a change here can mute a check' reasoning as tools/guardrails/src/**. Raised as a minor finding by Guardian's review of chatbots#50."
