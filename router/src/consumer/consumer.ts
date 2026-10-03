@@ -14,6 +14,7 @@
 import type { Logger } from 'pino';
 import type { AgentConfig } from '../config/index.js';
 import { loadAgentConfig } from '../config/index.js';
+import { type LabelRemover, enforceOwnerLabels } from '../github/ownerLabelGuard.js';
 import type { WebhookEvent } from '../ingress/types.js';
 import type { AlertPoster } from '../observability/index.js';
 import type { MetricsRegistry } from '../observability/index.js';
@@ -52,6 +53,9 @@ export type ConsumerDeps = {
   projectName: string;
   workspaceCfg?: ManagerConfig | undefined;
   alertPoster?: AlertPoster | undefined;
+  /** Removes a spoofed `agent:*` owner label from a PR (HAR-21). Omit to only
+   *  alert; routing ignores a spoofed label either way. */
+  removeLabel?: LabelRemover | undefined;
   /** Optional — writes per-session jsonl to `<sessionLogDir>/<id>.jsonl`. */
   sessionLogDir?: string | undefined;
   /** Optional — metrics registry to update on webhook receive + session complete. */
@@ -89,6 +93,15 @@ export async function handleEvent(
   event: WebhookEvent,
   deps: ConsumerDeps,
 ): Promise<ConsumerOutcome> {
+  // HAR-21: take a spoofed owner label off the PR and alert. Runs before, and
+  // independently of, classification, which already ignores such a label.
+  await enforceOwnerLabels(event, {
+    registry: deps.registry,
+    log: deps.log,
+    removeLabel: deps.removeLabel,
+    alertPoster: deps.alertPoster,
+  });
+
   const classification: Classification = classify(event, {
     registry: deps.registry,
     db: deps.db,

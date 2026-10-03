@@ -1421,7 +1421,11 @@ Labels signal to human reviewers what kind of scrutiny the PR deserves. `meta-se
 
 ### PR spoofing defense
 
-At PR-merge time (whether via GitHub UI or the GitHub MCP), the router validates that PRs labeled `agent:harness-bot` were actually opened by the Harness GitHub App identity (the `user.login` field in the PR webhook payload matches `harness-bot[bot]`). If not, the label is removed and a `#agents-alerts` notification fires — defends against a human accidentally (or maliciously) applying the label to a non-Harness PR.
+An `agent:<name>` label picks the agent a PR's events route to (`ownerFromLabel`, by agent id or Linear `agent_handle`). The defence stops one agent's App from taking over another agent's PR with that label. It runs on every PR-scoped GitHub event, not only at merge time.
+
+- **What counts as spoofed** (`spoofedOwnerLabel`, `routing/classifier.ts`): the PR was opened by one of the fleet's own Apps, and the label names a *different* agent. A PR opened by a person or by a third-party bot keeps any owner label, because a human relabelling a PR to hand it to another agent is legitimate. Every web-session PR is authored by the fleet owner's account, so those are never touched.
+- **Routing ignores it.** `resolvePrOwner` skips a spoofed label, so the PR's events stay with the App that opened it, even if removing the label fails.
+- **The label is removed and an alert fires** (`github/ownerLabelGuard.ts`, called first in `handleEvent`). Only the delivery to the PR author's own App acts, so GitHub's fan-out produces one removal and one alert. It mints that App's installation token from the payload's `installation.id`, then `DELETE`s the label (a 404 means it is already gone). An `owner_label_spoofed` alert goes to the author agent's alerts channel (`#agents-alerts` by default). It is posted at `warn` when the label was removed and at `error`, asking for manual removal, when it could not be.
 
 ### Session-log read access
 

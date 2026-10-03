@@ -17,8 +17,11 @@ export { extractMentionedAgent } from './mention.js';
 export { labelSkills, resolveSkill, workDefaultSkill } from './skill.js';
 export {
   classify,
+  findSpoofedOwnerLabels,
   isWorkTrigger,
   ownerFromLabel,
+  spoofedOwnerLabel,
+  type SpoofedOwnerLabel,
   type Classification,
   type ClassifyDeps,
   type ContinuationDecision,

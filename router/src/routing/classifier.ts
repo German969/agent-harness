@@ -231,12 +231,15 @@ function isGithubPrEvent(event: WebhookEvent): boolean {
 }
 
 /** The PR owner: an `agent:<name>` label if present (human-visible + overridable),
- *  else the agent whose GitHub App opened the PR (`<app-slug>[bot]` author). */
+ *  else the agent whose GitHub App opened the PR (`<app-slug>[bot]` author).
+ *
+ *  A spoofed owner label (see `spoofedOwnerLabel`) is skipped, so it never routes
+ *  even when removing it fails: the PR falls through to the App that opened it. */
 function resolvePrOwner(reg: Registry, event: WebhookEvent): AgentId | undefined {
   const { labels, authorLogin } = githubPrMeta(event);
   for (const name of labels) {
     const agent = ownerFromLabel(reg, name);
-    if (agent) return agent;
+    if (agent && !spoofedOwnerLabel(reg, name, authorLogin)) return agent;
   }
   if (authorLogin) {
     const opener = agentFromBotLogin(reg, authorLogin);
@@ -266,6 +269,59 @@ export function ownerFromLabel(reg: Registry, label: string): AgentId | undefine
     if (id.linear?.agent_handle === name) return id.agent;
   }
   return undefined;
+}
+
+export type SpoofedOwnerLabel = {
+  label: string;
+  /** The agent the label names. */
+  claimed: AgentId;
+  /** The agent whose GitHub App actually opened the PR. */
+  author: AgentId;
+};
+
+/**
+ * HAR-21: is `label` an owner label that names a different agent from the fleet
+ * App that opened the PR?
+ *
+ * An owner label is overridable on purpose: a person relabels a PR to hand it to
+ * another agent. What it must not do is let one agent's App take over another
+ * agent's PR, because since HAR-13 a handle-form label (`agent:harness-bot`)
+ * really routes the PR's events to that agent's session.
+ *
+ * So the check is narrow, as HAR-21 decided. A label counts as spoofed only when
+ * the PR's author is one of the fleet's own Apps AND the label names a different
+ * agent. A PR opened by a person (every web-session PR is authored by the fleet
+ * owner's account) or by a third-party bot keeps whatever owner label it carries,
+ * since an owner-applied label is legitimate.
+ */
+export function spoofedOwnerLabel(
+  reg: Registry,
+  label: string,
+  authorLogin: string | undefined,
+): SpoofedOwnerLabel | undefined {
+  const claimed = ownerFromLabel(reg, label);
+  if (!claimed || !authorLogin) return undefined;
+  const author = agentFromBotLogin(reg, authorLogin);
+  if (!author || author === claimed) return undefined;
+  return { label, claimed, author };
+}
+
+/** Every spoofed owner label on a PR-scoped GitHub event, with the PR it is on.
+ *  Empty for any other event. */
+export function findSpoofedOwnerLabels(
+  reg: Registry,
+  event: WebhookEvent,
+): { repo: string; number: number; spoofed: SpoofedOwnerLabel[] } | undefined {
+  if (event.provider !== 'github' || !isGithubPrEvent(event)) return undefined;
+  const ref = githubPrRef(event);
+  if (!ref) return undefined;
+  const { labels, authorLogin } = githubPrMeta(event);
+  const spoofed: SpoofedOwnerLabel[] = [];
+  for (const name of labels) {
+    const hit = spoofedOwnerLabel(reg, name, authorLogin);
+    if (hit) spoofed.push(hit);
+  }
+  return spoofed.length > 0 ? { ...ref, spoofed } : undefined;
 }
 
 /** Record the resolved owner for a PR event so CI events can be gated to it later.

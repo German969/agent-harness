@@ -7,6 +7,7 @@ import Fastify from 'fastify';
 import type { Logger } from 'pino';
 import { PACKAGE_VERSION, config } from './config.js';
 import { buildConsumer } from './consumer/index.js';
+import { buildLabelRemover } from './github/ownerLabelGuard.js';
 import { EventQueue } from './ingress/queue.js';
 import { registerIngressRoutes } from './ingress/routes.js';
 import {
@@ -203,6 +204,7 @@ export async function buildServer(overrides: BuildServerOverrides = {}) {
     targetProjectRoot,
     projectName,
     alertPoster,
+    removeLabel: buildLabelRemover(registry, secretProvider),
     ...(sessionLogDir ? { sessionLogDir } : {}),
     metrics,
     worktreeRoot: config.WORKTREE_ROOT,
