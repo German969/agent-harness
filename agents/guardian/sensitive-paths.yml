@@ -159,6 +159,10 @@ patterns:
     family: infra
     added: 2026-09-03
     reason: "Family pattern. Infrastructure-as-code changes production directly."
+  - glob: "**/.railway/**"
+    family: infra
+    added: 2026-10-03
+    reason: "Railway Infrastructure as Code (`.railway/railway.ts`) declares services, variables, domains, replicas and a preDeploy command, so it changes production directly. The `{terraform,pulumi,infra}/**` family glob misses it because the directory is `.railway/`. Not adopted yet (IRS-87); pre-registered so the adopting PR scans Deep. Replaces the 2026-09-25 `**/railway.{json,toml}` proposal: Railway deprecated config-as-code, new services can't opt in, and chatbots#33 withdrew its railway.json."
 
   # --- concrete patterns: code that exists in iris today ---
   - glob: ".github/workflows/**"
