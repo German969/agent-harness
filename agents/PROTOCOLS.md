@@ -1259,16 +1259,16 @@ Agent: <persona>
 
 ### 9.2 Before merging, read every review — all of them
 
-A green check is not a clean review. The Copilot check turns green when the review
-*ran*, whatever it found. The Routine reviews are ordinary PR comments with no check at
-all.
+A green check is not a clean review. None of the three reviewers posts a check: the
+Reviewer routine posts a PR review, and the Guardian and Platform Routines post ordinary PR
+comments. Skipping any of them is silent.
 
 Before merging a PR — only where your own blast radius already lets you merge; this rule
 grants no merge rights — read what each reviewer posted **on that PR**:
 
 | Reviewer | Where it lands | How to recognise it |
 |---|---|---|
-| **Copilot** | PR reviews **and** inline review threads | Author `copilot-pull-request-reviewer[bot]`. Read the review *body* too: its "Open", "Previously missed" and per-file notes are findings, and some never become an inline thread. |
+| **Reviewer** (claude.ai Routine, general code review; replaced GitHub Copilot on 2026-10-03) | A PR review (event `COMMENT`) **and** its inline review threads | Body starts `## Code review`, names the reviewed head as `**Head**: \`<sha>\``, ends `— Reviewer`. The author is the fleet owner's account. Each inline finding is tagged **Blocking**, **Should fix** or **Nit**. Read the review *body* too: its "Blocking", "Possible improvements" and "Worth a closer look" sections can hold items that never became an inline thread. |
 | **Guardian** (claude.ai Routine) | A PR conversation comment | Starts `## Guardian review`, ends `— Guardian`. The author is the fleet owner's account, not a bot. |
 | **Platform** (claude.ai Routine) | A PR conversation comment | Starts `## Platform review — architecture`; carries `<!-- platform-arch-review: <sha> -->`. The author is the fleet owner's account. |
 
@@ -1277,22 +1277,26 @@ Then:
 1. **Every finding is fixed or answered.** Fixed means pushed. Answered means a reply
    on that thread (or the review comment) saying why not. Resolve the threads you
    addressed. There is no third state.
-2. **Re-request Copilot after every push that answers it**, and read the re-review. A
-   re-review regularly finds something new — on 2026-09-24 it did on both PRs it re-reviewed.
+2. **Never request a Copilot review.** The Reviewer routine fires on its own when a PR
+   opens and on every push, and reviews each head once (it skips drafts and heads it has
+   already reviewed). After a push that answers it, wait for its review of the new head
+   and read it: a re-review regularly finds something new. There is nothing to request,
+   and no tool call that summons it.
 3. **Know which head each review covered.** The Routines review the head they fired on;
    Platform's marker names it. If you pushed since, say in the merge record whether the
    new commits touch that reviewer's lane.
 4. **A reviewer that has not posted yet is a wait, not a pass** — where it runs on that
    repo, and unless its own contract says it posts nothing for this PR. Guardian's
    router-path tier table posts nothing on Skip and only findings on Light; the claude.ai
-   Guardian Routine comments on every tier. As of 2026-09-25 neither Routine has commented on a `dev-team` PR; there, Copilot
-   and CI are the reviewers, and the merge record says so.
+   Guardian Routine comments on every tier. The three Routines are set up on
+   `chatbots` (as of 2026-10-03). On `dev-team` and `dev-team-state` no Routine reviews,
+   CI is the reviewer, and the merge record says so.
 5. **CI green on the current head, and no merge conflict.**
 6. **Record it in the merge commit body** — one line per reviewer: what it found, and on
    which head. Free, permanent, and greppable on `main`:
 
    ```
-   Reviews: Copilot — 0 open (re-review on 3d753b6). Guardian — Light, 0 findings (9c7dd7b).
+   Reviews: Reviewer — 0 open (re-review on 3d753b6). Guardian — Light, 0 findings (9c7dd7b).
    Platform — Light, no concerns (9c7dd7b). CI green on 778e838.
 
    Agent: platform
@@ -1329,7 +1333,7 @@ marked Done.
 - **A step your tools cannot do is handed off, never skipped.** The router's Linear tier
   has no delete tool, so a router session cannot remove an attachment itself: name the
   attachment and the issue to the fleet owner, and hold the merge until it is gone. The
-  same goes for any §9 step your toolset lacks — re-requesting Copilot included.
+  same goes for any §9 step your toolset lacks.
 - **The parent closes when its last sub-issue does**, and whoever closes it checks the
   parent's acceptance criteria rather than assuming the sub-issues covered them.
 
@@ -1341,6 +1345,7 @@ Each rule is a failure that happened, not a hypothetical:
   reviews. Without a signature, an agent reading a PR cannot tell whether it is its own
   to drive, another agent's to leave alone, or a human's.
 - **Reviews.** On 2026-09-24 a PR's Copilot check was green while its review body held
-  a finding no inline thread showed; a re-review after the fix found a new one. The
-  Guardian and Platform Routine reviews have no check at all — skipping them is silent.
+  a finding no inline thread showed; a re-review after the fix found a new one. Copilot
+  was replaced by the Reviewer routine on 2026-10-03; like the Guardian and Platform
+  Routines it has no check at all, so skipping it is silent.
 - **Linear.** IRS-6, above.
