@@ -222,6 +222,16 @@ patterns:
     added: 2026-10-02
     reason: "The ledger the target's `sensitive-path-candidates` guard reads before it asks for a proposal: any glob listed here, `proposed` or `not-sensitive`, mutes the guard for that path. A careless or wrong entry silences the check that feeds this registry, which is the same 'a change here can mute a check' reasoning as tools/guardrails/src/**. Raised as a minor finding by Guardian's review of chatbots#50."
 
+  # --- IRS-107, 2026-10-03: the worker half of tenant isolation, found by Guardian's review of chatbots#55.
+  - glob: "apps/iris-api/src/worker/**"
+    family: user-data
+    added: 2026-10-03
+    reason: "Tenant isolation, worker half. chatbots#55 (IRS-107) put ADR-0016's worker rule here: tenant-job.ts validates the job payload's tenantId and builds TenantContext.forWorker(tenantId) before a handler may touch a repository, and worker.service.ts decides which queues run through it. A change here can run a handler under the wrong tenant, or with none, and apps/iris-api/src/tenancy/** (deep) is only the other half. Every future tenant-queue handler (worker-ingest, IRS-48) lands in this directory."
+  - glob: "apps/iris-api/src/queue/{queues,queue.service}.ts"
+    family: user-data
+    added: 2026-10-03
+    reason: "Tenant isolation, producer half. queues.ts holds QUEUE_SCOPES: flipping a queue from 'tenant' to 'system' there turns off the worker's tenantId check for it, with no change under worker/. queue.service.ts's sendForTenant is the only place a job's tenantId is stamped from the caller's scope and a foreign tenant refused. boss.provider.ts and migrate.ts in the same directory are already deep (migrations family); these two files are not covered by that entry."
+
   # --- agent-authority: an Iris project extension (IRS-81) ---
   # Config the agent harness reads, not the model: it grants an agent session permission
   # to act without asking. The rest of .claude/** is instructions and stays light.
