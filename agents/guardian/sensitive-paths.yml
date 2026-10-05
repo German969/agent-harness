@@ -217,6 +217,10 @@ patterns:
     family: migrations
     added: 2026-10-02
     reason: "pg-boss's schema DDL. boss.provider.ts holds both halves: installQueueSchema runs it (migrate: true), and startPgBoss's `migrate: false` is the one setting that stops every API and worker boot from changing the production schema unreviewed, outside ADR-0010's gate. migrate.ts is the `pnpm queue:migrate` entry point that calls it. The pgboss schema lives in the app's own Postgres, so this is a migration in everything but path name; the `migrations` family glob does not reach it."
+  - glob: "apps/iris-api/src/config/**"
+    family: secrets
+    added: 2026-10-03
+    reason: "The boot-time env contract (IRS-69, chatbots#58): env-contract.ts lists which variables each process refuses to start without, and required-env.ts is the shared not-set/empty check. Removing or downgrading an entry silently lets a service boot without a credential, and nothing visible changes at runtime until the first request that needs it. Same 'a change here can mute a check' reasoning as tools/guardrails/src/**, applied to secrets handling. Raised by Guardian's review of chatbots#58."
   - glob: ".github/sensitive-path-candidates.json"
     family: infra
     added: 2026-10-02
