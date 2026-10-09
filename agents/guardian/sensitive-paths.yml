@@ -236,6 +236,30 @@ patterns:
     added: 2026-10-03
     reason: "Tenant isolation, producer half. queues.ts holds QUEUE_SCOPES: flipping a queue from 'tenant' to 'system' there turns off the worker's tenantId check for it, with no change under worker/. queue.service.ts's sendForTenant is the only place a job's tenantId is stamped from the caller's scope and a foreign tenant refused. boss.provider.ts and migrate.ts in the same directory are already deep (migrations family); these two files are not covered by that entry."
 
+  # --- IRS-193, 2026-10-09: the callers that build model payloads (Strategist drift sweep).
+  # packages/llm/** (the client) was deep; the code that decides what goes into a prompt
+  # was not. Extension 2 (`llm-payload-path`) in dev-team-state's
+  # projects/iris/guardian/sensitive-pattern-families.md proposed these "once the code
+  # exists"; it landed in M1. They use the existing `ai-prompts` family rather than a new
+  # one: the review they need is the same. A path cannot catch every new payload path
+  # (one can be built anywhere), so the reviewer still has to; these are the known homes.
+  - glob: "apps/iris-api/src/engine/**"
+    family: ai-prompts
+    added: 2026-10-09
+    reason: "The conversation engine: every customer reply. prompt-assembly.ts orders the prompt and marks which parts are `tenant` and `untrusted` for @app/llm to fence, history-window.ts picks which end-consumer messages reach the model (ADR-0012's first payload path, whose redaction is wired here), query-expansion.ts sends the customer's question for rewriting, and sentinel.ts/reply-check.ts decide when the model's reply is replaced by the fallback and what check line it must write first. A change here can drop a trust fence, widen what history is sent, or let an ungrounded reply through, with no change under packages/llm/**. Extension 2 proposed `**/conversation-engine/**`, which never matched: the directory is engine/. IRS-193."
+  - glob: "apps/iris-api/src/builder-agent/**"
+    family: ai-prompts
+    added: 2026-10-09
+    reason: "Leo, the onboarding agent: leo-prompt.ts is its system prompt, builder-agent.service.ts runs the tool loop, and tools.ts holds the tools the model may call, which write the tenant's agent config. That makes it the one place where model output turns directly into tenant writes, so a new tool or a loosened argument check is a privilege change for the model. It is also ADR-0012's second payload path once Leo samples end-consumer conversations. IRS-193."
+  - glob: "apps/iris-api/src/knowledge/qa-extraction*.ts"
+    family: ai-prompts
+    added: 2026-10-09
+    reason: "The FAQ-to-Q&A path (IRS-163): tenant-uploaded document text goes into a model prompt, and the extracted pairs are stored as knowledge the engine then quotes to customers. That makes it both an LLM payload path (it redacts and restores ADR-0012 tokens, so it is the fourth path COMPLIANCE.md says needs a compliance review, see IRS-167) and an indirect prompt-injection surface: a hostile document can steer what becomes a published answer. ingestion-pipeline.ts in the same directory only sends chunks to the embeddings endpoint, with no prompt and no model output acted on, so it stays light. IRS-193."
+  - glob: "apps/iris-api/src/sandbox/**"
+    family: ai-prompts
+    added: 2026-10-09
+    reason: "The sandbox (IRS-16a, chatbots#106): sandbox.service.ts chooses the draft prompt recipe the engine runs with and sends the Admin's message to the model, and sandbox.controller.ts plus sandbox-stream.ts stream model output to the browser over SSE (the AC-12 surface: guards before the stream opens, JSON-only frames, no error text after it). Its tenant isolation is in packages/db/src/tenancy/sandbox.ts, already deep under packages/db/src/**. IRS-193."
+
   # --- agent-authority: an Iris project extension (IRS-81) ---
   # Config the agent harness reads, not the model: it grants an agent session permission
   # to act without asking. The rest of .claude/** is instructions and stays light.
