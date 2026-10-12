@@ -250,15 +250,44 @@ patterns:
   - glob: "apps/iris-api/src/builder-agent/**"
     family: ai-prompts
     added: 2026-10-09
-    reason: "Leo, the onboarding agent: leo-prompt.ts is its system prompt, builder-agent.service.ts runs the tool loop, and tools.ts holds the tools the model may call, which write the tenant's agent config. That makes it the one place where model output turns directly into tenant writes, so a new tool or a loosened argument check is a privilege change for the model. It is also ADR-0012's second payload path once Leo samples end-consumer conversations. IRS-193."
+    reason: "Leo, the onboarding agent: leo-prompt.ts is its system prompt, builder-agent.service.ts runs the tool loop, and tools.ts holds the tools the model may call, which write the tenant's agent config. That makes it the one place where model output turns directly into tenant writes, so a new tool or a loosened argument check is a privilege change for the model: the `auto`-tier tools write config inside the turn with no Admin confirmation, and budget.ts holds the per-tenant token ledger (both raised by Guardian's review of chatbots#112, dev-team#92). It is also ADR-0012's second payload path once Leo samples end-consumer conversations. IRS-193."
   - glob: "apps/iris-api/src/knowledge/qa-extraction*.ts"
     family: ai-prompts
     added: 2026-10-09
-    reason: "The FAQ-to-Q&A path (IRS-163): tenant-uploaded document text goes into a model prompt, and the extracted pairs are stored as knowledge the engine then quotes to customers. That makes it both an LLM payload path (it redacts and restores ADR-0012 tokens, so it is the fourth path COMPLIANCE.md says needs a compliance review, see IRS-167) and an indirect prompt-injection surface: a hostile document can steer what becomes a published answer. ingestion-pipeline.ts in the same directory only sends chunks to the embeddings endpoint, with no prompt and no model output acted on, so it stays light. IRS-193."
+    reason: "The FAQ-to-Q&A path (IRS-163): tenant-uploaded document text goes into a model prompt, and the extracted pairs are stored as knowledge the engine then quotes to customers. That makes it both an LLM payload path (it redacts and restores ADR-0012 tokens, so it is the fourth path COMPLIANCE.md says needs a compliance review, see IRS-167) and an indirect prompt-injection surface: a hostile document can steer what becomes a published answer. ingestion-pipeline.ts in the same directory only sends chunks to the embeddings endpoint, with no prompt and no model output acted on, so it is not an ai-prompts path; it is deep anyway through apps/iris-api/src/knowledge/** (user-data). IRS-193."
   - glob: "apps/iris-api/src/sandbox/**"
     family: ai-prompts
     added: 2026-10-09
     reason: "The sandbox (IRS-16a, chatbots#106): sandbox.service.ts chooses the draft prompt recipe the engine runs with and sends the Admin's message to the model, and sandbox.controller.ts plus sandbox-stream.ts stream model output to the browser over SSE (the AC-12 surface: guards before the stream opens, JSON-only frames, no error text after it). Its tenant isolation is in packages/db/src/tenancy/sandbox.ts, already deep under packages/db/src/**. IRS-193."
+
+  # --- 2026-10-12: Guardian's per-review registry proposals of 2026-10-05..09, combined into
+  # one change at German's request. Each was raised by a chatbots PR review and opened as its
+  # own dev-team PR (#86-#98). The engine and builder-agent ones were superseded by IRS-193's
+  # entries above; these are the rest, re-checked against chatbots main b17feb8.
+  - glob: "apps/iris-web/middleware.ts"
+    family: auth
+    added: 2026-10-12
+    reason: "The only enforcement point for 'every dashboard route needs a Clerk session and an active business' (chatbots#69, IRS-7). It runs Clerk's clerkMiddleware, calls gate() from lib/auth/routes.ts (already deep via **/auth*/**), and its `config.matcher` decides which paths the gate sees at all: a matcher edit can silently exempt a route from authentication while every gate() test still passes. The `**/auth*/**` family glob misses it because the file sits at the app root, not in an auth directory. Raised by Guardian's review of chatbots#69 (dev-team#86)."
+  - glob: ".github/heavy-table-queries.json"
+    family: infra
+    added: 2026-10-12
+    reason: "The ledger the target's `heavy-table-queries` guard reads (IRS-62, chatbots#68, ADR-0021): a file with an entry here, `reviewed` or `not-a-query`, is exempt from the check that asks for its queries to be run against tools/volume-check before it reads knowledge_chunks, messages or conversations. One wrong entry silences the check for that file, which is the same 'a change here can mute a check' reasoning as .github/sensitive-path-candidates.json. Raised by Guardian's review of chatbots#68 (dev-team#87)."
+  - glob: "apps/iris-api/scripts/**"
+    family: migrations
+    added: 2026-10-12
+    reason: "The Railway pre-deploy scripts (chatbots#78): predeploy-migrate.sh runs `pnpm db:migrate` and `pnpm queue:migrate` against staging's database on every deploy, and its `RAILWAY_ENVIRONMENT_NAME == staging` guard is the only thing stopping that command from migrating production if it is copied into that environment's settings (STACK.md: production migration is manual, a non-negotiable). It runs DDL against a live database yet matches no migrations glob. A script-only change here (weakening the guard, changing how the direct URL is derived) would otherwise land at Light. Raised by Guardian's review of chatbots#78 (dev-team#88)."
+  - glob: "**/vercel.json"
+    family: infra
+    added: 2026-10-12
+    reason: "Deploy configuration for the web app (chatbots#86, apps/iris-web/vercel.json): its `ignoreCommand` decides which pushes build, and a wrong exit code or an incomplete path list silently skips a production deploy of main with nothing failing. Also carries redirects, headers and rewrites when added, which are production routing and security headers. The `{terraform,pulumi,infra}/**` family glob misses it. The script it calls (apps/iris-web/scripts/vercel-ignore-build.sh) is not added: it fails open (builds when unsure), and the file that wires it in is the one that matters. Raised by Guardian's review of chatbots#86 (dev-team#90)."
+  - glob: "apps/iris-api/src/storage/**"
+    family: user-data
+    added: 2026-10-12
+    reason: "Object storage (IRS-11, chatbots#98): R2ObjectStorage is the bucket credentials' only consumer and the one place tenant files are written, copied and deleted. Keys are tenant-prefixed (`tenants/{tenant}/...`, `staging/{tenant}/...`), and that prefix is the isolation boundary for stored documents, as the composite foreign keys are for rows: a change here can read or write across tenants with nothing under tenancy/ changing. Raised by Guardian's review of chatbots#98 (dev-team#91)."
+  - glob: "apps/iris-api/src/knowledge/**"
+    family: user-data
+    added: 2026-10-12
+    reason: "Tenant knowledge ingestion. Since chatbots#98 (IRS-11) it parses untrusted uploaded files (extractors/ for PDF, DOCX, MD, TXT; document-files.ts zip-bomb and macro checks; document-upload.ts streaming), and document-stages.ts enforces the tenant/agent key prefix before the worker reads an object. Hostile-file parsing and the tenant-key check both want a deep read. Overlaps the qa-extraction*.ts ai-prompts entry, which stays for its family. Raised by Guardian's review of chatbots#98 (dev-team#91)."
 
   # --- agent-authority: an Iris project extension (IRS-81) ---
   # Config the agent harness reads, not the model: it grants an agent session permission
