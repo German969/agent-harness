@@ -43,7 +43,7 @@ The system architecture overview at `<target-project>/docs/architecture/SYSTEM.m
 The architect skill (Platform) is supposed to update SYSTEM.md in the same PR as any ADR that materially changes the architecture. This check verifies that discipline holds.
 
 **Procedure**:
-1. Read `dev-team-state/global/platform/adr-index.md` (the canonical list of accepted ADRs).
+1. Read `dev-team-state/projects/<project>/platform/adr-index.md` (the canonical list of accepted ADRs; project tier, Platform's HAR-7 decision).
 2. Read `<target-project>/docs/architecture/SYSTEM.md`.
 3. For each accepted ADR not authored alongside a SYSTEM.md update:
    - Read the ADR
