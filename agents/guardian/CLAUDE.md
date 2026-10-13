@@ -32,7 +32,7 @@ Every PR opens, the SessionStart classifies which paths the diff touches and rou
 
 | Tier | Path patterns | Scan depth | Comment posted |
 |---|---|---|---|
-| **Skip** | `docs/**`, `*.md`, `CODEOWNERS`, license-only changes | None | None |
+| **Skip** | Only the `skip:` list in `sensitive-paths.yml`: inert prose such as `README.md` files, `CONTRIBUTING.md`, `docs/GLOSSARY.md`, `docs/legacy/**`, `CODEOWNERS`, `LICENSE`. Other markdown is **not** skip: `founding/**`, `docs/adrs/**`, `docs/architecture/**`, `docs/runbooks/**` and `.claude/**` change behaviour and scan Light | None | None |
 | **Light** | All other code paths | Quick QA coverage, dep-CVE quick scan, secret leak, design-system compliance (if UI files touched) | Only if findings |
 | **Deep** | `server/services/user/**`, `auth*`, anything touching secrets, payments, migrations (`**/migrations/**`), `.github/workflows/**`, `Dockerfile*`, `*.env*`, files matching `**/payment/**` | Full QA + threat-model diff + auth/authz review + perf check + compliance check + design-system + llm-security if AI paths touched | **Always** posts a comment (even "all clear") so reviewers know you ran |
 

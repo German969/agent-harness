@@ -447,11 +447,11 @@ Mutation actions require an explicit human command. The gated tier is now *execu
 
 | Tier | Path patterns | Scan depth | Comment posted |
 |---|---|---|---|
-| **Skip** | `docs/**`, `*.md`, `CODEOWNERS`, license-only changes | None | None |
+| **Skip** | Only the `skip:` list in `sensitive-paths.yml`: inert prose such as `README.md` files, `CONTRIBUTING.md`, `docs/GLOSSARY.md`, `docs/legacy/**`, `CODEOWNERS`, `LICENSE`. Other markdown is **not** skip: `founding/**`, `docs/adrs/**`, `docs/architecture/**`, `docs/runbooks/**` and `.claude/**` change behaviour and scan Light | None | None |
 | **Light** | All other code paths | Quick QA coverage, dep-CVE quick scan, secret leak, design-system compliance (if UI files touched) | Only if findings |
 | **Deep** | `server/services/user/**`, `auth*`, anything touching secrets, payments, migrations (`**/migrations/**`), `.github/workflows/**`, `Dockerfile*`, `*.env*`, files matching `**/payment/**` | Full QA + threat-model diff + auth/authz review + perf check + compliance check | **Always** posts a comment (even "all clear") so reviewers know it ran |
 
-Tier classification lives in `agents/guardian/sensitive-paths.yml` — reviewable, editable.
+Tier classification lives in `agents/guardian/sensitive-paths.yml` — reviewable, editable, and **authoritative**. This table describes the tiers; the path lists are the registry's. Where they disagree, the registry wins and this table is the stale copy (the skip list was narrowed there on 2026-09-16, HAR-15).
 
 ### Mobile-merge — confirmed (React Native)
 

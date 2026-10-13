@@ -46,7 +46,7 @@ The primary mode. Triggered by: PR open, PR push (new commits to an existing PR)
 Flow:
 1. **Ingest** — read the PR diff, the PR description, related Linear ticket if linked.
 2. **Classify path tier** per the locked decision in [AGENTS.md](../../AGENTS.md#guardian-auto-trigger--three-tier-path-scan):
-   - **Skip**: docs-only, comment-only, CODEOWNERS, license-only changes. End session, no comment.
+   - **Skip**: every changed path is on the `skip:` list in `sensitive-paths.yml` (inert prose: READMEs, CONTRIBUTING, the glossary, legacy docs, CODEOWNERS, LICENSE). End session, no comment. Markdown is not automatically skip: founding docs, ADRs, architecture, runbooks and `.claude/**` scan Light.
    - **Light**: most code paths. Run light versions of QA, security, design-system (UI files only), dep-CVE quick scan, secret-leak sweep. Post a comment only if findings.
    - **Deep**: sensitive paths (`server/services/user/**`, `auth*`, secrets-touching, payments, migrations, `.github/workflows/**`, `Dockerfile*`, `*.env*`, `**/payment/**`, **AI service paths + prompt files** for llm-security). Run all relevant skills at full depth. Always post a comment (even "all clear") so reviewers know Guardian ran.
 3. **Aggregate findings** — one PR comment, structured by category, severity-ordered. Don't split into six comments per skill.
