@@ -961,6 +961,23 @@ The Harness agent is the only one that mutates the `dev-team/` repo — agent pr
 
 It applies to every PR Harness opens. It also applies (by convention) to humans who edit `dev-team/` directly during bootstrap — same standards.
 
+### How Harness writes `dev-team` (decision, 2026-10-13)
+
+The router mounts `dev-team` **read-only**, so no `Edit`, `Write` or local `git` commit
+can land there. **Harness writes through the GitHub MCP**: `create_branch`, then
+`create_or_update_file` or `push_files` on that branch, then `create_pull_request`. The
+git-data tools cover moves and deletes. Guardian gets the same route for its one
+exception, `agents/guardian/sensitive-paths.yml` and `perf-sensitive-paths.yml`, and a
+`limit_repo_writes` PreToolUse hook refuses any other `dev-team` path. Both agents'
+hooks refuse these tools on a default branch, the same gate `git push` has.
+
+German chose this route on 2026-10-13 (HAR-9), over mounting `dev-team` read-write (it
+gives up the isolation every session relies on) and over dropping Guardian's self-edit
+exception. `validate:fleet` check 5b fails a `create_pr` hook on a repo the router
+cannot write when the agent has no such route, because that hook skips silently and the
+change is lost. Each agent's GitHub App still needs **Contents: read & write** on
+`dev-team` (`identities/README.md`).
+
 ### Every PR names the persona that opened it
 
 **Put `Agent: <persona>` on its own line** in the PR body, a commit message, or both —

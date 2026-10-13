@@ -44,6 +44,9 @@
       "mcp__github__get_*",
       "mcp__github__list_*",
       "mcp__github__search_*",
+      "mcp__github__create_branch",
+      "mcp__github__create_or_update_file",
+      "mcp__github__push_files",
       "mcp__github__create_issue",
       "mcp__github__create_issue_comment",
       "mcp__github__create_pull_request_review_comment",
@@ -284,6 +287,20 @@
       }
     ],
     "PreToolUse": [
+      {
+        "_comment": "HAR-9: Guardian's GitHub write tools reach dev-team only for its two registry files (the self-edit exception), and never a default branch. Writes to other repositories fall to the rules above.",
+        "tool": ["mcp__github__create_or_update_file", "mcp__github__push_files"],
+        "repo": "dev-team",
+        "allow_paths": ["agents/guardian/sensitive-paths.yml", "agents/guardian/perf-sensitive-paths.yml"],
+        "message": "🛑 In dev-team, Guardian may change only agents/guardian/sensitive-paths.yml and perf-sensitive-paths.yml."
+      },
+      {
+        "_comment": "HAR-9: the GitHub write tools commit straight to the branch they are given, so they get the same protected-branch gate as git push.",
+        "tool": ["mcp__github__create_or_update_file", "mcp__github__push_files", "mcp__github__create_branch"],
+        "patterns": ["\"branch\":\"(main|master|staging|production|prod)\""],
+        "deny_always": true,
+        "message": "🛑 Write to a feature branch and open a PR. Never commit to a default branch."
+      },
       {
         "_comment": "Block writes outside the narrow Guardian scopes (tests/, security/compliance/perf docs, dep manifests, own configs, own state).",
         "tool": "Write",

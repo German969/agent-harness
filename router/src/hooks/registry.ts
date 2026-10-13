@@ -11,6 +11,7 @@ import { checkHandler } from './commands/check.js';
 import { conditionalLoadHandler } from './commands/conditional_load.js';
 import { gitCommitHandler } from './commands/git_commit.js';
 import { gitCommitIfChangedHandler } from './commands/git_commit_if_changed.js';
+import { limitRepoWritesHandler } from './commands/limit_repo_writes.js';
 import { formatAndLintHandler, lintAndFormatHandler } from './commands/lint_stubs.js';
 import { loadHandler } from './commands/load.js';
 import { reCheckAgainstDenyPatternsHandler } from './commands/re_check_against_deny_patterns.js';
@@ -35,6 +36,7 @@ export const toolCallHandlers: Record<string, ToolCallHookHandler> = {
   block_if_command_matches: blockIfCommandMatchesHandler,
   re_check_against_deny_patterns: reCheckAgainstDenyPatternsHandler,
   block_if_url_matches: blockIfUrlMatchesHandler,
+  limit_repo_writes: limitRepoWritesHandler,
   // `validate: <name>` shapes — inferCommand resolves the name straight through.
   version_bump_only: versionBumpOnlyHandler,
   testimonial_permission_check: testimonialPermissionCheckHandler,
@@ -79,6 +81,7 @@ export function inferCommand(entry: Record<string, unknown>): string | undefined
   // Shape-based inference for tool-call hooks
   if ('block_if_path_matches' in entry) return 'block_if_path_matches';
   if ('block_if_action_matches' in entry) return 'block_if_action_matches';
+  if ('allow_paths' in entry) return 'limit_repo_writes';
   // Regex command gates (`patterns`/`pattern`) and flat tool denials (`deny_always`
   // with only a `tool` filter). The deny_always branch excludes shapes carrying a
   // condition key this handler does not evaluate (`if_url_or_query_matches`,

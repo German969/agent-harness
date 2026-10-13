@@ -41,6 +41,14 @@
       "mcp__github__get_*",
       "mcp__github__list_*",
       "mcp__github__search_*",
+      "mcp__github__create_branch",
+      "mcp__github__create_or_update_file",
+      "mcp__github__push_files",
+      "mcp__github__create_pull_request",
+      "mcp__github__update_pull_request",
+      "mcp__github_gitdata__move_file",
+      "mcp__github_gitdata__delete_file",
+      "mcp__github_gitdata__apply_file_ops",
 
       "Bash(ls:*)",
       "Bash(cat:*)",
@@ -198,6 +206,13 @@
       }
     ],
     "PreToolUse": [
+      {
+        "_comment": "HAR-9: the GitHub write tools commit straight to the branch they are given, so they get the same protected-branch gate as git push. Harness writes dev-team through these (its checkout is mounted :ro) on an agent/* branch, then opens a PR.",
+        "tool": ["mcp__github__create_or_update_file", "mcp__github__push_files", "mcp__github__create_branch"],
+        "patterns": ["\"branch\":\"(main|master|staging|production|prod)\""],
+        "deny_always": true,
+        "message": "🛑 Write to a feature branch (agent/harness-bot/...) and open a PR. Never commit to a default branch."
+      },
       {
         "_comment": "★ THE GATE — block any direct push to main. PR-only is Harness's defining constraint.",
         "tool": "Bash",

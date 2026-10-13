@@ -315,11 +315,12 @@ for (const agent of agentSet) {
   }
 }
 
-// 5b — where a `create_pr: true` hook actually points. NOT a failure: two of the
-//      four are inert by DESIGN, and deciding whether to remove them is a call
-//      about each agent's role rather than a config error. Reported because it
-//      was invisible — `create_pr` opened no PR at all until it was wired, and
-//      even now a hook on a repo the router cannot write never reaches the call.
+// 5b — where a `create_pr: true` hook actually points. A hook on a repo the router
+//      cannot write never reaches the PR call. That is a NOTE when the repo is
+//      inert by design (the marketing repo has no volume at all) or when the agent
+//      can still land the change through the GitHub MCP write tools, and a FAILURE
+//      otherwise (HAR-9): an agent whose only route to a repo is a hook that skips
+//      reports the change as made and the change is silently dropped.
 //
 //      Writability comes from deploy/docker-compose.yml's router mounts:
 //        dev-team                 :ro          (deliberate — Harness commits via
@@ -329,6 +330,14 @@ for (const agent of agentSet) {
 //        <workspace>              read-write   (the leased worktree)
 //        <target-project>-marketing  NOT MOUNTED — no volume exists
 const PR_CAPABLE_REPOS = new Set(['<target-project>', 'dev-team-state', '<workspace>']);
+// No volume and no agent is expected to write it through the router yet.
+const INERT_BY_DESIGN_REPOS = new Set(['<target-project>-marketing']);
+// A write tool plus create_pull_request is a complete route around the mount.
+const MCP_FILE_WRITE_TOOLS = [
+  'mcp__github__create_or_update_file',
+  'mcp__github__push_files',
+  'mcp__github_gitdata__apply_file_ops',
+];
 const inertPrHooks: string[] = [];
 for (const agent of agents) {
   let prConfig: ReturnType<typeof loadAgentConfig>;
@@ -342,9 +351,18 @@ for (const agent of agents) {
   >) {
     if (entry.create_pr !== true) continue;
     const repo = typeof entry.repo === 'string' ? entry.repo : '(no repo)';
-    if (!PR_CAPABLE_REPOS.has(repo)) {
+    if (PR_CAPABLE_REPOS.has(repo)) continue;
+    const allow = prConfig.settings.permissions?.allow ?? [];
+    const hasMcpRoute =
+      MCP_FILE_WRITE_TOOLS.some((t) => allow.includes(t)) &&
+      allow.includes('mcp__github__create_pull_request');
+    if (hasMcpRoute || INERT_BY_DESIGN_REPOS.has(repo)) {
       inertPrHooks.push(
-        `${agent}: create_pr on repo '${repo}', which the router cannot write — the hook skips before the PR call`,
+        `${agent}: create_pr on repo '${repo}', which the router cannot write — the hook skips before the PR call${hasMcpRoute ? ' (the agent writes it through the GitHub MCP instead)' : ''}`,
+      );
+    } else {
+      problems.push(
+        `${agent}: create_pr on repo '${repo}', which the router cannot write, and the agent has no GitHub MCP write route (a file-write tool plus mcp__github__create_pull_request in permissions.allow) — the change would be silently dropped`,
       );
     }
   }
