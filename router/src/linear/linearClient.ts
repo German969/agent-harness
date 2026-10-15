@@ -426,7 +426,10 @@ export function defaultGraphQL(token: string, baseUrl: string): LinearGraphQL {
         res.status === 401 || res.status === 403
           ? ' — LINEAR_TOKEN rejected (expired, revoked, or missing read scope); re-authorize the Linear OAuth app'
           : '';
-      throw new LinearError(`linear graphql HTTP ${res.status}${hint}`, res.status);
+      throw new LinearError(
+        `linear graphql HTTP ${res.status}${hint}${await errorDetail(res)}`,
+        res.status,
+      );
     }
     return (await res.json()) as { data?: unknown; errors?: Array<{ message: string }> };
   };
@@ -517,4 +520,23 @@ function toIssueDetail(n: unknown): IssueDetail {
     milestone: optString(n, ['projectMilestone', 'name']),
     labels,
   };
+}
+
+/**
+ * Linear answers a rejected query or mutation (a validation error, a key without
+ * write access) with HTTP 400 and the reason in the GraphQL `errors` body. Without
+ * it the failure reads only "HTTP 400" (HAR-8's first create run).
+ */
+async function errorDetail(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as {
+      errors?: Array<{ message?: string; extensions?: { userPresentableMessage?: string } }>;
+    };
+    const messages = (body.errors ?? [])
+      .map((e) => e.extensions?.userPresentableMessage ?? e.message)
+      .filter((m): m is string => typeof m === 'string' && m !== '');
+    return messages.length > 0 ? `: ${messages.join('; ')}` : '';
+  } catch {
+    return '';
+  }
 }
