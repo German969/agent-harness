@@ -23,7 +23,8 @@
 #     case, in backticks: `bug` for `Bug` (HAR-24).
 #
 # Labels are team-scoped in Linear; this file is the fleet's list, not any one
-# workspace's inventory. Whether each exists in a given workspace is HAR-8's check.
+# workspace's inventory. Whether each exists in Linear is checked by the
+# linear-labels workflow (HAR-8), which can also create the missing ones.
 
 version: 1
 

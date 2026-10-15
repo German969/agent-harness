@@ -780,16 +780,15 @@ These get created in the Linear workspace alongside the standard registry during
 
 ### One-time setup (Phase 1 of the bootstrap)
 
-Before any agent tries to apply a label, the labels must **exist in the Linear workspace**. This is a one-time human task during Phase 1 of the bootstrap (see [PLAN.md](../PLAN.md) → Phase 1).
+Before any agent tries to apply a label, the labels must **exist in the Linear workspace**. The `linear-labels` workflow (HAR-8) checks that they do and creates the missing ones; a human only provides the key (see [PLAN.md](../PLAN.md) → Phase 1).
 
 Setup procedure:
-1. Authenticated as a Linear admin, navigate to the workspace's label settings.
-2. Create every label in the tables above, with its description from `agents/linear-labels.yml` (Linear caps a description at 255 characters; check 9 enforces it).
-3. Create any custom labels defined in the project's `.dev-team.yml`.
-4. Group labels in Linear by category for readability (Linear supports label groups in some plans).
-5. Document the workspace's label set in `<target-project>/founding/` (a small `LINEAR.md` is fine) so humans creating tickets manually know what's available.
+1. Add a Linear personal API key that can write labels as the `LINEAR_API_KEY` Actions secret on the dev-team repo.
+2. Add the project's team, and which agents work in it, to `.github/workflows/linear-labels.yml`.
+3. Run the `linear-labels` workflow with `mode=create`. It creates every missing label with its description from `agents/linear-labels.yml`, then re-lists them to verify. It never edits, renames or deletes a label; one that differs from the registry only in case is reported for a human to rename.
+4. Create any custom labels defined in the project's `.dev-team.yml` by hand.
 
-Checking that the workspace actually has them, and creating the missing ones from `agents/linear-labels.yml`, is HAR-8. Until it lands, this step is manual; the Iris team's labels were created by hand on 2026-09-10.
+After that the same workflow checks weekly, and on every merge that changes the identities or `agents/linear-labels.yml`, that the labels still exist. Locally: `pnpm labels:linear --team <KEY> --agents <a,b> [--conventions] [--create]` from `router/`, with `LINEAR_API_KEY` set. The identity files are the source of truth; the tables above are generated from them.
 
 ### Why this protocol exists
 

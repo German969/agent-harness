@@ -1,0 +1,84 @@
+name: linear-labels
+
+# Do the Linear labels the fleet routes on actually exist? (HAR-8)
+#
+# The labels come from routing.linear_labels in identities/*.yml and LABEL_SKILLS;
+# agents/linear-labels.yml describes them. validate:fleet (fleet-config.yml) checks
+# that those agree, offline, on every PR. This workflow does the half that needs a
+# Linear key: asking Linear whether the labels are there. On 2026-09-10 five of ~51
+# declared routing labels existed and nothing said so.
+#
+# Deliberately NOT on pull_request, for the same reason as github-labels.yml: a PR
+# that adds a routing label is red until the label exists, and it should only be
+# created once the change merges. The check runs on push to main when the inputs
+# change, weekly (labels can be renamed or deleted in Linear at any time), and by
+# hand.
+#
+# Scope, by team. Labels are team-scoped in Linear, and a label nobody uses yet only
+# crowds a picker people use daily, so each team gets the labels of the agents that
+# work in it:
+#   IRS  the five Iris agents, plus the convention labels (severity, status)
+#   HAR  harness
+# Marketer is left out until it comes online; add it to the IRS line then.
+#
+# `mode=create` (manual, from main only) creates the missing labels with their
+# descriptions, then re-lists them. It never edits, renames or deletes a label.
+# It needs LINEAR_API_KEY to be able to write; the check only reads.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agents/linear-labels.yml'
+      - 'identities/**'
+      - 'router/src/routing/skill.ts'
+      - 'router/src/config/linearLabelSync.ts'
+      - 'router/scripts/linear-labels-sync.ts'
+      - '.github/workflows/linear-labels.yml'
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check (report missing labels) or create (add the missing ones)'
+        type: choice
+        options: [check, create]
+        default: check
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linear-labels
+  cancel-in-progress: false
+
+jobs:
+  labels:
+    # Create only from main. workflow_dispatch checks out whatever ref is selected,
+    # so without this a branch could run its own registry and script with the key.
+    if: github.event_name != 'workflow_dispatch' || inputs.mode == 'check' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+      CREATE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'create' && '--create' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.10.0
+          cache: pnpm
+          cache-dependency-path: router/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: router
+      - name: IRS (Iris agents and conventions)
+        if: ${{ !cancelled() }}
+        run: pnpm labels:linear --team IRS --agents strategist,platform,builder-server,builder-client,guardian --conventions $CREATE
+        working-directory: router
+      - name: HAR (harness)
+        if: ${{ !cancelled() }}
+        run: pnpm labels:linear --team HAR --agents harness $CREATE
+        working-directory: router

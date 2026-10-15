@@ -22,6 +22,7 @@
     "validate:fleet": "tsx scripts/validate-fleet-config.ts",
     "labels:github": "tsx scripts/github-labels.ts",
     "labels:protocols": "tsx scripts/linear-labels.ts",
+    "labels:linear": "tsx scripts/linear-labels-sync.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

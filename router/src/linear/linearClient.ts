@@ -410,7 +410,7 @@ export function linearAuthHeader(token: string): string {
   return token.startsWith('lin_api_') ? token : `Bearer ${token}`;
 }
 
-function defaultGraphQL(token: string, baseUrl: string): LinearGraphQL {
+export function defaultGraphQL(token: string, baseUrl: string): LinearGraphQL {
   const authHeader = linearAuthHeader(token);
   return async (query, variables) => {
     const res = await fetch(baseUrl, {
