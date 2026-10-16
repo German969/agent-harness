@@ -289,6 +289,12 @@ patterns:
     added: 2026-10-12
     reason: "Tenant knowledge ingestion. Since chatbots#98 (IRS-11) it parses untrusted uploaded files (extractors/ for PDF, DOCX, MD, TXT; document-files.ts zip-bomb and macro checks; document-upload.ts streaming), and document-stages.ts enforces the tenant/agent key prefix before the worker reads an object. Hostile-file parsing and the tenant-key check both want a deep read. Overlaps the qa-extraction*.ts ai-prompts entry, which stays for its family. Raised by Guardian's review of chatbots#98 (dev-team#91)."
 
+  # --- 2026-10-13: the adversarial eval suite, found by Guardian's review of chatbots#141.
+  - glob: "tests/llm-security/**"
+    family: ai-prompts
+    added: 2026-10-13
+    reason: "The adversarial eval suite (harness.ts and the *.evals.test.ts files). tool-runtime.evals.test.ts pins Leo's auto-tier allowlist (AUTO_TIER_ALLOWLIST) and says that adding to it is a security decision reviewed by Guardian; a one-line edit there changes what the model may do without the Admin confirming, and the suite stays green. The same 'a change here can mute a check' reasoning as tools/guardrails/src/**. None of the existing ai-prompts globs reach it, so chatbots#141 scanned Light. Raised by Guardian's review of chatbots#141."
+
   # --- agent-authority: an Iris project extension (IRS-81) ---
   # Config the agent harness reads, not the model: it grants an agent session permission
   # to act without asking. The rest of .claude/** is instructions and stays light.
