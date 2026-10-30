@@ -306,3 +306,23 @@ patterns:
     family: agent-authority
     added: 2026-10-02
     reason: "Forward-looking: none exists in the target yet. It declares the MCP servers a project session connects to, including the command each one runs, so adding a server adds both an executable and a set of tools an agent can call. The same silent widening as .claude/settings*.json, which is why IRS-81 asked whether to include it. IRS-81."
+  - glob: "apps/iris-api/src/whatsapp/**"
+    family: webhooks
+    added: 2026-10-29
+    reason: "The WhatsApp Cloud API gateway (IRS-19 slice 19a, chatbots#237, ADR-0024). The controller serves the unauthenticated GET/POST /webhooks/whatsapp, meta-webhook.decorator.ts is the marker AuthGuard reads to skip Clerk, and meta-signature*.ts holds the HMAC check that replaces it. A change here can open a route with no authentication or weaken the only check on it. `**/webhooks/**` misses it because the directory is whatsapp/, not webhooks/. Slice 19b's ingest and the outbound sender land in this directory too."
+  - glob: "**/{safety,moderation,crisis}/**"
+    family: ai-prompts
+    added: 2026-10-29
+    reason: "The non-removable safety layers (IRS-22, ADR-0026; chatbots#239 added apps/iris-api/src/safety/). outbound.ts is the gate that decides whether a reply or the tenant's fallback_message reaches a customer, and moderation.ts holds the block thresholds and the fail-closed rule. COMPLIANCE.md makes any change that weakens or bypasses either layer a compliance review, never an engineering call, yet no entry here matched the directory, so the PR scanned only through its other deep paths. Uses ai-prompts rather than the safety-layers family proposed in dev-team-state's sensitive-pattern-families.md Extension 1, which is not in `families:` yet; the review needed is the same. Raised by Guardian's review of chatbots#239."
+  - glob: "apps/iris-api/src/compliance/**"
+    family: user-data
+    added: 2026-10-29
+    reason: "The compliance floor's API side (IRS-23, chatbots#240): ConsumerErasureController and ConsumerErasureService serve POST /tenant/consumer-erasures, which deletes an end-consumer's conversations and queues the deletion of their R2 objects. A change here can erase the wrong consumer, skip the tenant scope, or stop an erasure from ever finishing, and no entry matched the directory (`**/{user,users,profile,identity,pii}/**` needs one of those names). Raised by Guardian's review of chatbots#240."
+  - glob: ".github/pii-read-paths.json"
+    family: audit
+    added: 2026-10-29
+    reason: "The ledger the target's `pii-read-access` guard reads (IRS-23, chatbots#240): a file with an entry here, `not-a-human-view` or `not-a-query`, is exempt from the check that requires a pii_access_log row when it reads messages. One wrong entry silences the audit trail COMPLIANCE.md requires for every view of a consumer's history, the same 'a change here can mute a check' reasoning as .github/heavy-table-queries.json. Raised by Guardian's review of chatbots#240."
+  - glob: "packages/db/src/tenancy/{consumer-erasure,pii-access-log}.ts"
+    family: user-data
+    added: 2026-10-29
+    reason: "The repositories under IRS-23's erasure and PII read log (chatbots#240). consumer-erasure.ts decides which rows a consumer's erasure deletes; pii-access-log.ts writes the read-access audit COMPLIANCE.md calls the log most likely to be forgotten. Neither is under schema/** or apps/iris-api/src/{tenancy,compliance}/**, so a change that narrows the delete or drops a log write would scan Light. Proposed by Builder-Server 2 on chatbots#240."

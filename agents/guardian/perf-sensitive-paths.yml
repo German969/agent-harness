@@ -144,6 +144,17 @@ patterns:
       than through component code. Scoped to the three files rather than apps/iris-web/**
       so ordinary UI work does not arm a perf pass it does not need.
 
+  - glob: "packages/db/src/tenancy/knowledge-retrieval.ts"
+    category: vector-retrieval
+    added: 2026-10-19
+    reason: >-
+      The hybrid retriever's two queries (vector half and lexical half), the file ADR-0021's volume check
+      (tools/volume-check/retrieval.sql) must stay in step with. It matches no entry above: it is neither
+      under schema/** nor in a directory named retrieval/. chatbots#191 (IRS-252) widened both branches
+      from `source_id IN (live sources)` to `... OR section_id IS NOT NULL`, which changes the plan the
+      200k-chunk numbers were measured on. A diff that touches only this file would get no perf pass. Raised by
+      Guardian's review of chatbots#191.
+
   # --- forward-looking: paths that do not exist yet ---
   - glob: "**/{retrieval,rag,search}/**"
     category: vector-retrieval
