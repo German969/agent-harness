@@ -326,3 +326,15 @@ patterns:
     family: user-data
     added: 2026-10-29
     reason: "The repositories under IRS-23's erasure and PII read log (chatbots#240). consumer-erasure.ts decides which rows a consumer's erasure deletes; pii-access-log.ts writes the read-access audit COMPLIANCE.md calls the log most likely to be forgotten. Neither is under schema/** or apps/iris-api/src/{tenancy,compliance}/**, so a change that narrows the delete or drops a log write would scan Light. Proposed by Builder-Server 2 on chatbots#240."
+  - glob: "apps/iris-api/src/usage/**"
+    family: audit
+    added: 2026-11-02
+    reason: "The LLM usage sink (IRS-53 53a, chatbots#258, ADR-0008 amendment): LlmUsageSink hands every model call's record to LlmUsageLedger, which writes llm_usage_events for whatever tenant the record names, and tools/guardrails/src/tenant-access.ts lets only this directory and DatabaseModule touch the ledger. The same rows are the one counter the $1/day per-tenant and $25/day platform caps read (next slice), so a change here can write usage to the wrong tenant, drop rows silently, or under-count spend and let a cap pass. No entry matched the directory: `apps/iris-api/src/**` is perf-only. Raised by Guardian's review of chatbots#258."
+  - glob: "apps/iris-web/{components/whatsapp/**,lib/api/*whatsapp.ts}"
+    family: webhooks
+    added: 2026-11-04
+    reason: "The web side of the WhatsApp connection (IRS-18 18e, chatbots#267). Today a stub that makes no request, but 18b turns use-whatsapp.ts into the real calls and adds the Meta SDK loader: a third-party script loaded into the dashboard, Embedded Signup's postMessage result forwarded to iris-api, and the disconnect action. A wrong origin check or a token held client-side is an external-integration flaw, and nothing there is under app/api/** or apps/iris-api/src/whatsapp/**, so that PR would scan Light. Proposed by Guardian's review of chatbots#267."
+  - glob: "apps/iris-api/src/alerts/**"
+    family: secrets
+    added: 2026-11-04
+    reason: "Outbound alert channel (IRS-24, chatbots#268). alert-channel.ts builds the Telegram URL with the bot token in its path and posts to a Slack webhook URL, so a logged URL or error message leaks a credential; alert-router.ts and platform-alert.ts decide which ids leave Iris for a third-party chat app. Matches no existing pattern, since the directory is alerts/. Raised by Guardian's review of chatbots#268."
