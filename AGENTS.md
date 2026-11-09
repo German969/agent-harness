@@ -622,7 +622,7 @@ The target project is greenfield (see [PLAN.md](PLAN.md) → Target project). Th
 ### Founding decisions (Phase 0)
 
 1. **Target project working title + GitHub org** — pick the name and where it lives (existing personal, new org, or under an existing org). Determines `<target-project>` everywhere and the bot GitHub Apps' install location.
-2. **Tech stack** — drafted by a temporary architect-style Claude Code session in Phase 0; human picks. Becomes part of the house-style base prompt that all Builder agents inherit. (None of the stack-specific path references in this doc — `server/`, `client/`, `acme/mobile`, etc. — apply until this is decided; they're shown as examples.)
+2. **Tech stack** — drafted by a temporary architect-style Claude Code session in Phase 0; human picks. Becomes part of the house-style base prompt that all Builder agents inherit. (None of the stack-specific path references in this doc — `server/`, `client/`, `mobile/`, etc. — apply until this is decided; they're shown as examples.)
 3. **Brand voice + project narrative** — drafted by a temporary marketer-style Claude Code session in Phase 0. Three voice options, human picks one. Becomes the Marketer's foundation.
 4. **Mobile**: is mobile in scope at all? If yes, RN or native? (Drives whether Builder-Client's mobile skill is enabled at launch.)
 

@@ -30,7 +30,7 @@ jobs live in `scheduler/schedules.yml`.
 - **Caps** — $6.00 per job, $80.00/month. Both enforced. The token caps beside them in
   `settings.json` are not — see `agents/PROTOCOLS.md` for which `costCap` fields are real.
 - **Live MCP servers** — `linear`, `github`, `slack`. Platform has a real GitHub App
-  (`app_id: 123456`) installed on the target project, and real Slack ids.
+  installed on the target project, and real Slack ids (set at deploy time; see `identities/README.md`).
 - **Skill resolution** — one skill per session. The selectors `design`, `adr`, `cost`,
   `release`, `incident` map to `system-design`, `architect`, `finops`, `release-manager`,
   `incident-response`. Any other work trigger lands on `architect`; a bare mention lands

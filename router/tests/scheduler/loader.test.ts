@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   ScheduleFileError,
@@ -122,8 +123,8 @@ describe('loadSchedules', () => {
   });
 
   it('parses the real schedules.yml from dev-team/ without error', () => {
-    // Only run when the sibling repo layout is present locally.
-    const real = '/path/to/dev-team/scheduler/schedules.yml';
+    // This repo's own schedules.yml, three levels up from router/tests/scheduler.
+    const real = fileURLToPath(new URL('../../../scheduler/schedules.yml', import.meta.url));
     try {
       const entries = loadSchedules(real);
       expect(entries.length).toBeGreaterThan(5);

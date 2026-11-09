@@ -669,7 +669,7 @@ Dev:
 - [x] `dev-team-logs schedule list` outputs the table (id, agent, cron, state, source, last_run, last_outcome)
 - [x] `dev-team-logs schedule enable <id>` writes override + appends history + reports new effective state
 - [x] `schedule disable` / `reset` / `run` / `history` all working end-to-end
-- [x] Smoke-tested against the real `/path/to/dev-team/scheduler/schedules.yml` (23 entries)
+- [x] Smoke-tested against the real `scheduler/schedules.yml` (23 entries)
 - [x] `cost --month YYYY-MM` returns per-agent breakdown + month total
 - [x] `trigger <thread-key>` cross-agent listing with thread total cost
 - [x] `agent <name> --since 1h --status running` filters both dimensions

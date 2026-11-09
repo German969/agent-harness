@@ -54,7 +54,7 @@ this, state still commits locally but pushes fail (harmless warnings in the log)
 ## 2. Clone the dev-team repo
 
 ```bash
-sudo -u agents git clone git@github.com:acme/dev-team.git /opt/dev-team
+sudo -u agents git clone git@github.com:<your-org>/dev-team.git /opt/dev-team
 cd /opt/dev-team
 ```
 

@@ -10,11 +10,11 @@ agent: strategist
 # ============================================================================
 github:
   app_slug: dev-team-strategist                   # https://github.com/apps/dev-team-strategist
-  app_id: 123456                                 # numeric App ID
+  app_id: ~                                        # numeric App ID; fill at deploy
   bot_username: strategist-agent                  # display name in reply footers
-  installation_url: https://github.com/apps/dev-team-strategist/installations/7654321
+  installation_url: ~                                                                   # fill at deploy
   installations:
-    target_project: 7654321                     # installation_id on German969/chatbots (the target project)
+    target_project: ~                              # installation_id on German969/chatbots (the target project); fill at deploy
   # Target repo — Strategist's founding/PRD/research outputs land here.
   target_repo:
     owner: German969
@@ -34,15 +34,15 @@ linear:
   # agent that handles Linear events. The classifier routes those by mention
   # (linear.agent_handle) → assignee → label (routing.linear_labels). Leave `~` on every
   # other agent; two identities claiming it would make secret lookup order-dependent.
-  webhook_id: 00000000-0000-0000-0000-000000000000
+  webhook_id: ~                                    # fill at deploy
 
 # ============================================================================
 # Slack app identity
 # ============================================================================
 slack:
-  app_id: A0123ABCDEF                                       # 'A0...' — fill in at Phase 7
-  bot_user_id: U0123ABCDEF                                  # 'U0...' — for @-mention matching
-  team_id: T0123ABCDEF                                      # workspace id — consumed by the slack MCP as ${SLACK_TEAM_ID}
+  app_id: ~                                                  # 'A0...' — fill in at Phase 7
+  bot_user_id: ~                                             # 'U0...' — for @-mention matching; fill at deploy
+  team_id: ~                                                 # workspace id — consumed by the slack MCP as ${SLACK_TEAM_ID}; fill at deploy
   channels:
     primary:                                      # Strategist's natural Slack territory
       - "#engineering"

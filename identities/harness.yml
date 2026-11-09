@@ -15,12 +15,12 @@ agent: harness
 # ============================================================================
 github:
   app_slug: dev-team-harness                      # https://github.com/apps/dev-team-harness
-  app_id: 123456                                 # numeric App ID
+  app_id: ~                                        # numeric App ID; fill at deploy
   bot_username: harness-agent                     # display name in reply footers (parallel to strategist-agent)
-  installation_url: https://github.com/apps/dev-team-harness/installations/7654321
+  installation_url: ~                                                                # fill at deploy
   # Harness only installs on the dev-team repo. Target projects are off-limits.
   installations:
-    dev_team_repo: 7654321                      # installation_id for dev-team repo
+    dev_team_repo: ~                               # installation_id for dev-team repo; fill at deploy
 
 # ============================================================================
 # Linear agent identity
@@ -34,9 +34,9 @@ linear:
 # Slack app identity
 # ============================================================================
 slack:
-  app_id: A0123ABCDEF
-  bot_user_id: U0123ABCDEF
-  team_id: T0123ABCDEF                              # workspace id — consumed by the slack MCP as ${SLACK_TEAM_ID}
+  app_id: ~           # fill at deploy
+  bot_user_id: ~           # fill at deploy
+  team_id: ~                                         # workspace id — consumed by the slack MCP as ${SLACK_TEAM_ID}; fill at deploy
   channels:
     primary:
       - "#harness-engineering"                    # dedicated channel for meta-work; primary

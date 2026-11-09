@@ -10,11 +10,11 @@ agent: platform
 # ============================================================================
 github:
   app_slug: dev-team-platform                     # https://github.com/apps/dev-team-platform (confirm exact slug)
-  app_id: 123456                                 # numeric App ID
+  app_id: ~                                        # numeric App ID; fill at deploy
   bot_username: platform-agent                    # display name in reply footers
-  installation_url: https://github.com/apps/dev-team-platform/installations/7654321
+  installation_url: ~                                                                 # fill at deploy
   installations:
-    target_project: 7654321                      # installation_id on German969/chatbots
+    target_project: ~                               # installation_id on German969/chatbots; fill at deploy
   # Target repo — Platform's IaC / CI / scaffold PRs land here.
   target_repo:
     owner: German969
@@ -33,9 +33,9 @@ linear:
 # Slack app identity
 # ============================================================================
 slack:
-  app_id: A0123ABCDEF
-  bot_user_id: U0123ABCDEF
-  team_id: T0123ABCDEF                                      # 'T...' workspace id - required by the slack MCP (${SLACK_TEAM_ID})
+  app_id: ~           # fill at deploy
+  bot_user_id: ~           # fill at deploy
+  team_id: ~                                                 # 'T...' workspace id - required by the slack MCP (${SLACK_TEAM_ID}); fill at deploy
   channels:
     primary:
       - "#engineering"                            # release-manager + architect post here
